@@ -1,0 +1,34 @@
+{
+  "stage1_manifest": "data/stage1_source_curation/manifests/clean_real_manifest.csv",
+  "output_root": "data/stage2_clean_masters",
+  "workers": 6,
+  "overwrite": false,
+  "allow_partial_failures": true,
+  "timeouts": {
+    "ffmpeg_sec": 120,
+    "ffprobe_sec": 30
+  },
+  "audio_output": {
+    "sample_rate": 16000,
+    "channels": 1,
+    "codec_name": "pcm_s16le",
+    "sample_fmt": "s16",
+    "extension": ".wav"
+  },
+  "trim": {
+    "enabled": true,
+    "threshold_db": -35.0,
+    "start_duration_sec": 0.2,
+    "stop_duration_sec": 0.2
+  },
+  "loudnorm": {
+    "enabled": true,
+    "integrated_lufs": -23.0,
+    "lra": 7.0,
+    "true_peak_db": -2.0
+  },
+  "validation": {
+    "min_duration_sec": 2.5,
+    "max_duration_sec": 12.0
+  }
+}

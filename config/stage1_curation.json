@@ -1,0 +1,44 @@
+{
+  "output_root": "data/stage1_source_curation",
+  "seed": 20260309,
+  "workers": 6,
+  "allow_partial_target": true,
+  "splits": {
+    "train": 0.7,
+    "dev": 0.15,
+    "test": 0.15
+  },
+  "audio_filters": {
+    "min_duration_sec": 3.5,
+    "max_duration_sec": 12.0,
+    "preferred_min_duration_sec": 4.0,
+    "preferred_max_duration_sec": 8.0,
+    "min_mean_volume_db": -35.0,
+    "max_peak_volume_db": 0.0,
+    "min_speech_ratio": 0.55,
+    "silence_noise_threshold_db": -35,
+    "silence_min_duration_sec": 0.2
+  },
+  "languages": {
+    "zh": {
+      "source_corpus": "AISHELL-3",
+      "license_tag": "OpenSLR-93",
+      "speaker_id_prefix": "zh_aishell3_spk",
+      "target_speakers": 100,
+      "target_utterances_per_speaker": 60,
+      "min_utterances_per_speaker": 40,
+      "max_audio_checks_per_speaker": 0,
+      "dataset_root": "data/AISHELL-3"
+    },
+    "en": {
+      "source_corpus": "CommonVoice-24.0",
+      "license_tag": "Mozilla-Common-Voice-24.0",
+      "speaker_id_prefix": "en_cv24_spk",
+      "target_speakers": 400,
+      "target_utterances_per_speaker": 50,
+      "min_utterances_per_speaker": 30,
+      "max_audio_checks_per_speaker": 60,
+      "dataset_root": "data/cv-corpus-24.0-2025-12-05/en"
+    }
+  }
+}

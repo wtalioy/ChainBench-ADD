@@ -1,0 +1,176 @@
+{
+  "stage2_manifest": "data/stage2_clean_masters/manifests/clean_parent_manifest.csv",
+  "output_root": "data/stage3_spoof_generation",
+  "seed": 20260309,
+  "workers": 6,
+  "generators_per_parent": 2,
+  "allow_partial_failures": true,
+  "postprocess": {
+    "enabled": true,
+    "audio_output": {
+      "sample_rate": 16000,
+      "channels": 1,
+      "codec_name": "pcm_s16le",
+      "sample_fmt": "s16",
+      "extension": ".wav"
+    },
+    "trim": {
+      "enabled": true,
+      "threshold_db": -35.0,
+      "start_duration_sec": 0.2,
+      "stop_duration_sec": 0.2
+    },
+    "loudnorm": {
+      "enabled": true,
+      "integrated_lufs": -23.0,
+      "lra": 7.0,
+      "true_peak_db": -2.0
+    }
+  },
+  "validation": {
+    "min_duration_sec": 1.5,
+    "max_duration_sec": 20.0,
+    "min_duration_ratio": 0.35,
+    "max_duration_ratio": 3.0
+  },
+  "generators": {
+    "qwen3_tts_base": {
+      "enabled": true,
+      "generator_family": "multilingual_instruction_tts",
+      "generator_name": "Qwen3-TTS",
+      "adapter": "qwen3_clone",
+      "repo_path": "generators/Qwen3-TTS",
+      "conda_env": "qwen3-tts",
+      "supported_languages": [
+        "zh",
+        "en"
+      ],
+      "adapter_config": {
+        "model_path": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+        "device": "cuda:2",
+        "dtype": "bfloat16",
+        "attn_implementation": "flash_attention_2",
+        "generation_kwargs": {
+          "max_new_tokens": 2048,
+          "do_sample": true,
+          "top_k": 50,
+          "top_p": 1.0,
+          "temperature": 0.9,
+          "repetition_penalty": 1.05,
+          "subtalker_dosample": true,
+          "subtalker_top_k": 50,
+          "subtalker_top_p": 1.0,
+          "subtalker_temperature": 0.9
+        }
+      }
+    },
+    "cosyvoice3": {
+      "enabled": true,
+      "generator_family": "multilingual_instruction_tts",
+      "generator_name": "CosyVoice3",
+      "adapter": "cosyvoice3_clone",
+      "repo_path": "generators/CosyVoice",
+      "conda_env": "cosyvoice",
+      "supported_languages": [
+        "zh",
+        "en"
+      ],
+      "adapter_config": {
+        "model_path": "pretrained_models/Fun-CosyVoice3-0.5B-2512",
+        "hf_repo_id": "FunAudioLLM/Fun-CosyVoice3-0.5B-2512",
+        "device": "cuda:1",
+        "speed": 1.0,
+        "prepend_prompt_prefix": "You are a helpful assistant.<|endofprompt|>",
+        "stream": false,
+        "text_frontend": true
+      }
+    },
+    "spark_tts": {
+      "enabled": true,
+      "generator_family": "zero_shot_cloning_tts",
+      "generator_name": "Spark-TTS",
+      "adapter": "sparktts_clone",
+      "repo_path": "generators/Spark-TTS",
+      "conda_env": "sparktts",
+      "supported_languages": [
+        "zh",
+        "en"
+      ],
+      "adapter_config": {
+        "model_dir": "pretrained_models/Spark-TTS-0.5B",
+        "hf_repo_id": "SparkAudio/Spark-TTS-0.5B",
+        "device": "cuda:6",
+        "temperature": 0.8,
+        "top_k": 50,
+        "top_p": 0.95
+      }
+    },
+    "f5_tts": {
+      "enabled": true,
+      "generator_family": "zero_shot_cloning_tts",
+      "generator_name": "F5-TTS",
+      "adapter": "f5tts_clone",
+      "repo_path": "generators/F5-TTS",
+      "conda_env": "f5-tts",
+      "supported_languages": [
+        "zh",
+        "en"
+      ],
+      "adapter_config": {
+        "model": "F5TTS_v1_Base",
+        "device": "cuda:3",
+        "remove_silence": true,
+        "target_rms": 0.1,
+        "cross_fade_duration": 0.15,
+        "sway_sampling_coef": -1,
+        "cfg_strength": 2.0,
+        "nfe_step": 32,
+        "speed": 1.0
+      }
+    },
+    "index_tts2": {
+      "enabled": true,
+      "generator_family": "expressive_controllable_tts",
+      "generator_name": "IndexTTS2",
+      "adapter": "indextts2_clone",
+      "repo_path": "generators/index-tts",
+      "conda_env": "indextts",
+      "supported_languages": [
+        "zh",
+        "en"
+      ],
+      "adapter_config": {
+        "cfg_path": "checkpoints/config.yaml",
+        "model_dir": "checkpoints",
+        "hf_repo_id": "IndexTeam/IndexTTS-2",
+        "device": "cuda:7",
+        "use_fp16": false,
+        "use_cuda_kernel": false,
+        "use_deepspeed": false,
+        "use_accel": false,
+        "use_torch_compile": false
+      }
+    },
+    "voxcpm": {
+      "enabled": true,
+      "generator_family": "architecture_diverse_tts",
+      "generator_name": "VoxCPM",
+      "adapter": "voxcpm_clone",
+      "repo_path": "generators/VoxCPM",
+      "conda_env": "voxcpm",
+      "supported_languages": [
+        "zh",
+        "en"
+      ],
+      "adapter_config": {
+        "hf_model_id": "openbmb/VoxCPM1.5",
+        "device": "cuda:5",
+        "cfg_value": 2.0,
+        "inference_timesteps": 10,
+        "normalize": false,
+        "denoise": false,
+        "local_files_only": false
+      }
+    }
+  }
+}
