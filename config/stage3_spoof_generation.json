@@ -3,8 +3,13 @@
   "output_root": "data/stage3_spoof_generation",
   "seed": 20260309,
   "workers": 6,
+  "postprocess_workers": 8,
   "generators_per_parent": 2,
   "allow_partial_failures": true,
+  "timeouts": {
+    "ffmpeg_sec": 120,
+    "ffprobe_sec": 30
+  },
   "postprocess": {
     "enabled": true,
     "audio_output": {
@@ -47,7 +52,7 @@
       ],
       "adapter_config": {
         "model_path": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
-        "device": "cuda:2",
+        "device": "cuda:1",
         "dtype": "bfloat16",
         "attn_implementation": "flash_attention_2",
         "generation_kwargs": {
@@ -78,7 +83,7 @@
       "adapter_config": {
         "model_path": "pretrained_models/Fun-CosyVoice3-0.5B-2512",
         "hf_repo_id": "FunAudioLLM/Fun-CosyVoice3-0.5B-2512",
-        "device": "cuda:1",
+        "device": "cuda:2",
         "speed": 1.0,
         "prepend_prompt_prefix": "You are a helpful assistant.<|endofprompt|>",
         "stream": false,
@@ -99,7 +104,7 @@
       "adapter_config": {
         "model_dir": "pretrained_models/Spark-TTS-0.5B",
         "hf_repo_id": "SparkAudio/Spark-TTS-0.5B",
-        "device": "cuda:6",
+        "device": "cuda:3",
         "temperature": 0.8,
         "top_k": 50,
         "top_p": 0.95
@@ -118,7 +123,7 @@
       ],
       "adapter_config": {
         "model": "F5TTS_v1_Base",
-        "device": "cuda:3",
+        "device": "cuda:4",
         "remove_silence": true,
         "target_rms": 0.1,
         "cross_fade_duration": 0.15,
@@ -143,7 +148,7 @@
         "cfg_path": "checkpoints/config.yaml",
         "model_dir": "checkpoints",
         "hf_repo_id": "IndexTeam/IndexTTS-2",
-        "device": "cuda:7",
+        "device": "cuda:5",
         "use_fp16": false,
         "use_cuda_kernel": false,
         "use_deepspeed": false,
@@ -164,7 +169,7 @@
       ],
       "adapter_config": {
         "hf_model_id": "openbmb/VoxCPM1.5",
-        "device": "cuda:5",
+        "device": "cuda:6",
         "cfg_value": 2.0,
         "inference_timesteps": 10,
         "normalize": false,

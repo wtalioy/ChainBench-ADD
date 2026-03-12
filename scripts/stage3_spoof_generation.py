@@ -94,15 +94,30 @@ def relative_to_workspace(path: Path, workspace_root: Path) -> str:
     return str(path.resolve().relative_to(workspace_root.resolve())).replace(os.sep, "/")
 
 
-def run_command(command: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        command,
-        cwd=str(cwd) if cwd else None,
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+def run_command(
+    command: list[str],
+    cwd: Path | None = None,
+    timeout_sec: int | None = None,
+) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            command,
+            cwd=str(cwd) if cwd else None,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout_sec,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout if isinstance(exc.stdout, str) else ""
+        stderr = exc.stderr if isinstance(exc.stderr, str) else ""
+        return subprocess.CompletedProcess(
+            args=command,
+            returncode=124,
+            stdout=stdout,
+            stderr=(stderr + f"\nTIMEOUT after {timeout_sec}s").strip(),
+        )
 
 
 def run_command_streaming(
@@ -199,7 +214,7 @@ def extract_traceback_or_tail(log_path: Path, max_lines: int = 40) -> str:
     return "\n".join(lines[-max_lines:])
 
 
-def ffprobe_audio(path: Path) -> dict[str, Any] | None:
+def ffprobe_audio(path: Path, timeout_sec: int = 30) -> dict[str, Any] | None:
     result = run_command(
         [
             "ffprobe",
@@ -214,7 +229,8 @@ def ffprobe_audio(path: Path) -> dict[str, Any] | None:
             "-of",
             "json",
             str(path),
-        ]
+        ],
+        timeout_sec=timeout_sec,
     )
     if result.returncode != 0:
         return None
@@ -259,8 +275,13 @@ def postprocess_audio(raw_path: Path, final_path: Path, config: dict[str, Any]) 
     post_cfg = config.get("postprocess", {})
     if not post_cfg.get("enabled", False):
         if raw_path.resolve() != final_path.resolve():
+            if final_path.exists() and final_path.stat().st_size > 0:
+                return None  # already have final output, skip copy
             final_path.parent.mkdir(parents=True, exist_ok=True)
             final_path.write_bytes(raw_path.read_bytes())
+        return None
+
+    if final_path.exists() and final_path.stat().st_size > 0:
         return None
 
     final_path.parent.mkdir(parents=True, exist_ok=True)
@@ -288,8 +309,12 @@ def postprocess_audio(raw_path: Path, final_path: Path, config: dict[str, Any]) 
     if filter_chain:
         command.extend(["-af", filter_chain])
     command.extend(["-c:a", str(audio_cfg["codec_name"]), str(tmp_path)])
-    result = run_command(command)
+    timeout_cfg = config.get("timeouts", {})
+    ffmpeg_timeout_sec = int(timeout_cfg.get("ffmpeg_sec", 120))
+    result = run_command(command, timeout_sec=ffmpeg_timeout_sec)
     if result.returncode != 0:
+        if result.returncode == 124:
+            return result.stderr.strip() or f"ffmpeg postprocess TIMEOUT after {ffmpeg_timeout_sec}s"
         return result.stderr.strip() or "ffmpeg postprocess failed"
     tmp_path.replace(final_path)
     return None
@@ -564,6 +589,15 @@ def materialize_generator_jobs(
         )
 
 
+def _postprocess_one(
+    args: tuple[str, str, dict[str, Any], Path, Path, dict[str, Any]],
+) -> tuple[str, str, str | None]:
+    """Run postprocess_audio for one job; return (job_id, generator_key, error)."""
+    job_id, generator_key, _job, raw_path, final_path, config = args
+    err = postprocess_audio(raw_path, final_path, config)
+    return (job_id, generator_key, err)
+
+
 def collect_spoof_rows(
     jobs_by_generator: dict[str, list[dict[str, Any]]],
     generator_cfgs: dict[str, dict[str, Any]],
@@ -578,6 +612,44 @@ def collect_spoof_rows(
     processed = 0
     total_results = sum(len(jobs) for jobs in jobs_by_generator.values())
     started_at = time.monotonic()
+    timeout_cfg = config.get("timeouts", {})
+    ffprobe_timeout_sec = int(timeout_cfg.get("ffprobe_sec", 30))
+
+    # Phase 1: run postprocess in parallel for all jobs that need it (final not yet present)
+    need_postprocess: list[tuple[str, str, dict[str, Any], Path, Path, dict[str, Any]]] = []
+    for generator_key, jobs in jobs_by_generator.items():
+        job_map = {job["job_id"]: job for job in jobs}
+        results_path = output_root / "results" / f"{generator_key}.jsonl"
+        results = load_jsonl(results_path)
+        for result in results:
+            if result["status"] == "failed":
+                continue
+            job = job_map[result["job_id"]]
+            raw_path = Path(job["raw_output_path"])
+            final_path = Path(job["final_output_path"])
+            if not (final_path.exists() and final_path.stat().st_size > 0):
+                need_postprocess.append(
+                    (job["job_id"], generator_key, job, raw_path, final_path, config),
+                )
+    postprocess_results: dict[tuple[str, str], str | None] = {}
+    if need_postprocess:
+        postprocess_workers = max(1, int(config.get("postprocess_workers", 8)))
+        n_postprocess = len(need_postprocess)
+        LOGGER.info(
+            "Postprocessing %d audios with %d workers",
+            n_postprocess,
+            postprocess_workers,
+        )
+        with ThreadPoolExecutor(max_workers=postprocess_workers) as executor:
+            with tqdm(
+                total=n_postprocess,
+                desc="postprocess",
+                unit="audio",
+                dynamic_ncols=True,
+            ) as postprocess_progress:
+                for job_id, generator_key, err in executor.map(_postprocess_one, need_postprocess):
+                    postprocess_results[(job_id, generator_key)] = err
+                    postprocess_progress.update(1)
 
     with tqdm(total=total_results, desc="stage3 validate", unit="job", dynamic_ncols=True) as validate_progress:
         for generator_key, jobs in jobs_by_generator.items():
@@ -612,7 +684,8 @@ def collect_spoof_rows(
 
                 raw_path = Path(job["raw_output_path"])
                 final_path = Path(job["final_output_path"])
-                post_error = postprocess_audio(raw_path, final_path, config)
+                key = (job["job_id"], generator_key)
+                post_error = postprocess_results[key] if key in postprocess_results else postprocess_audio(raw_path, final_path, config)
                 if post_error is not None:
                     stats["postprocess_failed"] += 1
                     failures.append(
@@ -634,7 +707,7 @@ def collect_spoof_rows(
                         )
                     continue
 
-                probe = ffprobe_audio(final_path)
+                probe = ffprobe_audio(final_path, timeout_sec=ffprobe_timeout_sec)
                 if probe is None:
                     stats["ffprobe_failed"] += 1
                     failures.append(
