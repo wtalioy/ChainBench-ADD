@@ -2,7 +2,8 @@
   "input_manifest": "data/stage3_spoof_generation/manifests/clean_parent_manifest_all.csv",
   "output_root": "data/stage4_delivery_chain",
   "seed": 20260310,
-  "workers": 0,
+  "variants_per_parent": 1,
+  "workers": 32,
   "overwrite": false,
   "allow_partial_failures": true,
   "performance": {
@@ -16,6 +17,7 @@
   "families": {
     "direct": {
       "enabled": true,
+      "variants_per_parent": 1,
       "templates": [
         {
           "template_id": "direct_clean",
@@ -25,6 +27,7 @@
     },
     "platform_like": {
       "enabled": true,
+      "variants_per_parent": 2,
       "templates": [
         {
           "template_id": "aac_single",
@@ -103,11 +106,63 @@
               }
             }
           ]
+        },
+        {
+          "template_id": "aac_resample_reencode",
+          "operators": [
+            {
+              "op": "codec",
+              "codec": "aac",
+              "bitrate": {
+                "$pool": "aac_bitrates"
+              }
+            },
+            {
+              "op": "resample",
+              "mode": {
+                "$pool": "platform_resample_modes"
+              }
+            },
+            {
+              "op": "reencode",
+              "mode": {
+                "$choice": [
+                  "same",
+                  "cross"
+                ]
+              },
+              "codec": {
+                "$pool": "reencode_codecs"
+              },
+              "bitrate": {
+                "$pool": "reencode_bitrates"
+              }
+            }
+          ]
+        },
+        {
+          "template_id": "resample_opus",
+          "operators": [
+            {
+              "op": "resample",
+              "mode": {
+                "$pool": "platform_resample_modes"
+              }
+            },
+            {
+              "op": "codec",
+              "codec": "opus",
+              "bitrate": {
+                "$pool": "opus_bitrates"
+              }
+            }
+          ]
         }
       ]
     },
     "telephony": {
       "enabled": true,
+      "variants_per_parent": 2,
       "templates": [
         {
           "template_id": "nb_mulaw",
@@ -173,11 +228,177 @@
               }
             }
           ]
+        },
+        {
+          "template_id": "nb_resample_mulaw_plr",
+          "operators": [
+            {
+              "op": "resample",
+              "mode": "16k_to_8k"
+            },
+            {
+              "op": "bandlimit",
+              "mode": "NB"
+            },
+            {
+              "op": "codec",
+              "codec": "pcm_mulaw",
+              "encode_sample_rate": 8000
+            },
+            {
+              "op": "packet_loss",
+              "loss_rate_pct": {
+                "$pool": "packet_loss_rates"
+              },
+              "avg_burst_frames": {
+                "$pool": "packet_loss_burst_frames"
+              },
+              "concealment": {
+                "$pool": "packet_loss_concealment"
+              }
+            }
+          ]
+        },
+        {
+          "template_id": "wb_resample_opus_plr",
+          "operators": [
+            {
+              "op": "resample",
+              "mode": "16k_to_24k"
+            },
+            {
+              "op": "bandlimit",
+              "mode": "WB"
+            },
+            {
+              "op": "codec",
+              "codec": "opus",
+              "bitrate": {
+                "$pool": "telephony_opus_bitrates"
+              },
+              "encode_sample_rate": 16000
+            },
+            {
+              "op": "packet_loss",
+              "loss_rate_pct": {
+                "$pool": "packet_loss_rates"
+              },
+              "avg_burst_frames": {
+                "$pool": "packet_loss_burst_frames"
+              },
+              "concealment": {
+                "$pool": "packet_loss_concealment"
+              }
+            }
+          ]
+        },
+        {
+          "template_id": "wb_opus_resample_return",
+          "operators": [
+            {
+              "op": "bandlimit",
+              "mode": "WB"
+            },
+            {
+              "op": "codec",
+              "codec": "opus",
+              "bitrate": {
+                "$pool": "telephony_opus_bitrates"
+              },
+              "encode_sample_rate": 16000
+            },
+            {
+              "op": "resample",
+              "mode": "16k_to_8k_to_16k"
+            }
+          ]
+        },
+        {
+          "template_id": "session_nb_mulaw",
+          "operators": [
+            {
+              "op": "telephony_session",
+              "profile": "NB",
+              "codec": "pcm_mulaw",
+              "encode_sample_rate": 8000,
+              "loss_rate_pct": {
+                "$pool": "packet_loss_rates"
+              },
+              "avg_burst_frames": {
+                "$pool": "packet_loss_burst_frames"
+              },
+              "concealment": {
+                "$pool": "packet_loss_concealment"
+              },
+              "jitter_ms": {
+                "$pool": "telephony_jitter_ms"
+              },
+              "agc_profile": {
+                "$pool": "telephony_agc_profiles"
+              }
+            }
+          ]
+        },
+        {
+          "template_id": "session_nb_gsm",
+          "operators": [
+            {
+              "op": "telephony_session",
+              "profile": "NB",
+              "codec": "gsm",
+              "encode_sample_rate": 8000,
+              "loss_rate_pct": {
+                "$pool": "packet_loss_rates"
+              },
+              "avg_burst_frames": {
+                "$pool": "packet_loss_burst_frames"
+              },
+              "concealment": {
+                "$pool": "packet_loss_concealment"
+              },
+              "jitter_ms": {
+                "$pool": "telephony_jitter_ms"
+              },
+              "agc_profile": {
+                "$pool": "telephony_agc_profiles"
+              }
+            }
+          ]
+        },
+        {
+          "template_id": "session_wb_opus",
+          "operators": [
+            {
+              "op": "telephony_session",
+              "profile": "WB",
+              "codec": "opus",
+              "bitrate": {
+                "$pool": "telephony_opus_bitrates"
+              },
+              "encode_sample_rate": 16000,
+              "loss_rate_pct": {
+                "$pool": "packet_loss_rates"
+              },
+              "avg_burst_frames": {
+                "$pool": "packet_loss_burst_frames"
+              },
+              "concealment": {
+                "$pool": "packet_loss_concealment"
+              },
+              "jitter_ms": {
+                "$pool": "telephony_jitter_ms"
+              },
+              "agc_profile": {
+                "$pool": "telephony_agc_profiles"
+              }
+            }
+          ]
         }
       ]
     },
     "simreplay": {
       "enabled": true,
+      "variants_per_parent": 2,
       "templates": [
         {
           "template_id": "rir_only",
@@ -313,11 +534,83 @@
               }
             }
           ]
+        },
+        {
+          "template_id": "rir_noise_resample",
+          "operators": [
+            {
+              "op": "rir",
+              "room": {
+                "$pool": "rooms"
+              },
+              "rt60": {
+                "$pool": "rt60_values"
+              },
+              "distance": {
+                "$pool": "distances_m"
+              }
+            },
+            {
+              "op": "noise",
+              "noise_type": {
+                "$pool": "noise_types"
+              },
+              "snr_db": {
+                "$pool": "noise_snr_db"
+              }
+            },
+            {
+              "op": "resample",
+              "mode": {
+                "$pool": "simreplay_resample_modes"
+              }
+            }
+          ]
+        },
+        {
+          "template_id": "resample_rir_reencode",
+          "operators": [
+            {
+              "op": "resample",
+              "mode": {
+                "$pool": "simreplay_resample_modes"
+              }
+            },
+            {
+              "op": "rir",
+              "room": {
+                "$pool": "rooms"
+              },
+              "rt60": {
+                "$pool": "rt60_values"
+              },
+              "distance": {
+                "$pool": "distances_m"
+              }
+            },
+            {
+              "op": "reencode",
+              "mode": {
+                "$choice": [
+                  "same",
+                  "cross"
+                ]
+              },
+              "codec": {
+                "$pool": "reencode_codecs"
+              },
+              "bitrate": {
+                "$pool": "reencode_bitrates"
+              },
+              "default_codec": "aac"
+            }
+          ]
         }
       ]
     },
     "hybrid": {
       "enabled": true,
+      "variants_per_parent": 2,
       "templates": [
         {
           "template_id": "opus_plr_rir",
@@ -564,6 +857,80 @@
               }
             }
           ]
+        },
+        {
+          "template_id": "resample_codec_rir",
+          "operators": [
+            {
+              "op": "resample",
+              "mode": {
+                "$pool": "hybrid_resample_modes"
+              }
+            },
+            {
+              "op": "codec",
+              "codec": {
+                "$choice": [
+                  "aac",
+                  "opus"
+                ]
+              },
+              "bitrate": {
+                "$pool": "hybrid_codec_bitrates"
+              }
+            },
+            {
+              "op": "rir",
+              "room": {
+                "$pool": "rooms"
+              },
+              "rt60": {
+                "$pool": "rt60_values"
+              },
+              "distance": {
+                "$pool": "distances_m"
+              }
+            }
+          ]
+        },
+        {
+          "template_id": "bandlimit_resample_codec",
+          "operators": [
+            {
+              "op": "bandlimit",
+              "mode": {
+                "$choice": [
+                  "NB",
+                  "WB"
+                ]
+              }
+            },
+            {
+              "op": "resample",
+              "mode": {
+                "$pool": "hybrid_resample_modes"
+              }
+            },
+            {
+              "op": "codec",
+              "codec": {
+                "$choice": [
+                  "gsm",
+                  "pcm_mulaw",
+                  "opus"
+                ]
+              },
+              "bitrate": {
+                "$pool": "hybrid_codec_bitrates"
+              },
+              "encode_sample_rate": {
+                "$choice": [
+                  8000,
+                  16000
+                ]
+              }
+            }
+          ]
         }
       ]
     }
@@ -591,6 +958,19 @@
       "24k",
       "32k"
     ],
+    "platform_resample_modes": [
+      "16k_to_8k_to_16k",
+      "16k_to_24k_to_16k"
+    ],
+    "simreplay_resample_modes": [
+      "16k_to_24k_to_16k",
+      "16k_to_32k_to_16k"
+    ],
+    "hybrid_resample_modes": [
+      "16k_to_8k",
+      "16k_to_24k",
+      "16k_to_8k_to_16k"
+    ],
     "hybrid_codec_bitrates": [
       "16k",
       "24k",
@@ -602,14 +982,37 @@
       5,
       10
     ],
+    "packet_loss_burst_frames": [
+      2,
+      3,
+      5
+    ],
+    "packet_loss_concealment": [
+      "repeat_fade",
+      "interpolate",
+      "noise_fill"
+    ],
+    "telephony_jitter_ms": [
+      0.0,
+      8.0,
+      16.0
+    ],
+    "telephony_agc_profiles": [
+      "mild",
+      "telephony"
+    ],
     "noise_types": [
       "white",
       "pink",
-      "brown"
+      "brown",
+      "babble",
+      "hiss",
+      "hum"
     ],
     "noise_snr_db": [
       30,
       20,
+      15,
       10
     ],
     "rt60_values": [
@@ -652,7 +1055,9 @@
     ]
   },
   "packet_loss": {
-    "frame_ms": 20
+    "frame_ms": 20,
+    "avg_burst_frames": 3.0,
+    "concealment": "repeat_fade"
   },
   "rir": {
     "backend": "pyroomacoustics",

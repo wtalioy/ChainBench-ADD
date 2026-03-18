@@ -111,9 +111,6 @@ def _source_for_row(row: dict[str, str], attack_index: int) -> str:
     label = _label_to_protocol_token(row.get("label", ""))
     if label == "bonafide":
         return "bonafide"
-    chain = (row.get("chain_family") or "").strip()
-    if chain:
-        return chain.replace(" ", "_")
     return ATTACK_TYPES[attack_index % len(ATTACK_TYPES)]
 
 

@@ -28,36 +28,53 @@ class ResampleOperator(DeliveryOperator):
         mode = params["mode"]
         metadata["mode"] = mode
         if mode == "16k_to_8k":
-            self._resample_roundtrip(input_path, output_path, 8000)
+            self._resample_once(input_path, output_path, 8000)
         elif mode == "16k_to_24k":
-            self._resample_roundtrip(input_path, output_path, 24000)
+            self._resample_once(input_path, output_path, 24000)
+        elif mode == "16k_to_32k":
+            self._resample_once(input_path, output_path, 32000)
+        elif mode == "8k_to_16k":
+            self._resample_once(input_path, output_path, 16000)
+        elif mode == "24k_to_16k":
+            self._resample_once(input_path, output_path, 16000)
+        elif mode == "32k_to_16k":
+            self._resample_once(input_path, output_path, 16000)
+        elif mode == "16k_to_8k_to_16k":
+            self._resample_roundtrip(input_path, output_path, 8000, 16000)
+        elif mode == "16k_to_24k_to_16k":
+            self._resample_roundtrip(input_path, output_path, 24000, 16000)
         elif mode == "16k_to_32k_to_16k":
-            self._resample_roundtrip(input_path, output_path, 32000)
+            self._resample_roundtrip(input_path, output_path, 32000, 16000)
         else:
             raise ValueError(f"Unsupported resample mode: {mode}")
 
     @staticmethod
-    def _resample_roundtrip(input_path: Path, output_path: Path, mid_sample_rate: int) -> None:
+    def _resample_once(input_path: Path, output_path: Path, sample_rate: int) -> None:
+        command = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", str(input_path),
+            "-ac", "1",
+            "-af", "aresample=resampler=soxr:precision=28",
+            "-ar", str(sample_rate),
+            "-c:a", "pcm_s16le",
+            str(output_path),
+        ]
+        result = run_command(command)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "ffmpeg resample step failed")
+
+    @classmethod
+    def _resample_roundtrip(
+        cls,
+        input_path: Path,
+        output_path: Path,
+        mid_sample_rate: int,
+        final_sample_rate: int,
+    ) -> None:
         mid_path = output_path.with_name(f"{output_path.stem}__mid_{mid_sample_rate}.wav")
         try:
-            cmd1 = [
-                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", str(input_path),
-                "-ac", "1", "-ar", str(mid_sample_rate), "-c:a", "pcm_s16le",
-                str(mid_path),
-            ]
-            r1 = run_command(cmd1)
-            if r1.returncode != 0:
-                raise RuntimeError(r1.stderr.strip() or "ffmpeg resample step failed")
-            cmd2 = [
-                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", str(mid_path),
-                "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
-                str(output_path),
-            ]
-            r2 = run_command(cmd2)
-            if r2.returncode != 0:
-                raise RuntimeError(r2.stderr.strip() or "ffmpeg resample return step failed")
+            cls._resample_once(input_path, mid_path, mid_sample_rate)
+            cls._resample_once(mid_path, output_path, final_sample_rate)
         finally:
             try:
                 mid_path.unlink()

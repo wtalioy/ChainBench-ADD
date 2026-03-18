@@ -26,9 +26,13 @@ class BandLimitOperator(DeliveryOperator):
         mode = params["mode"]
         metadata["mode"] = mode
         if mode == "NB":
-            filter_chain = "highpass=f=300,lowpass=f=3400"
+            filter_chain = (
+                "highpass=f=250:poles=2,"
+                "lowpass=f=3400:poles=2,"
+                "compand=attacks=0.01:decays=0.15:points=-80/-80|-18/-18|0/-3"
+            )
         elif mode == "WB":
-            filter_chain = "highpass=f=50,lowpass=f=7000"
+            filter_chain = "highpass=f=50:poles=2,lowpass=f=7000:poles=2"
         else:
             raise ValueError(f"Unsupported bandlimit mode: {mode}")
-        ffmpeg_filter_to_wav(input_path, output_path, filter_chain)
+        ffmpeg_filter_to_wav(input_path, output_path, filter_chain, sample_rate=None)

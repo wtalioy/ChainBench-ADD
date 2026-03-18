@@ -8,6 +8,7 @@ from typing import Any
 from lib.logging import get_logger
 
 from ..tasks import TaskPack
+from .checkpoints import shared_training_key
 from .models import AssignedJob, RunRecord
 from .runner import run_baseline
 from .state import PipelineState
@@ -41,6 +42,7 @@ def assign_jobs_to_devices(
     train_only: bool,
 ) -> list[AssignedJob]:
     pool_counters: dict[tuple[str, ...], int] = {}
+    shared_training_devices: dict[tuple[tuple[str, ...], str], str] = {}
     assigned_jobs: list[AssignedJob] = []
     for index, (pack, baseline_name) in enumerate((pack, baseline_name) for pack in packs for baseline_name in baseline_names):
         device_pool = execution_device_pool(
@@ -49,9 +51,17 @@ def assign_jobs_to_devices(
             train_only=train_only,
         )
         pool_key = tuple(device_pool)
-        slot_index = pool_counters.get(pool_key, 0)
-        execution_device = device_pool[slot_index % len(device_pool)]
-        pool_counters[pool_key] = slot_index + 1
+        shared_key = None
+        if baseline_configs[baseline_name]["train"]["enabled"] and not eval_only:
+            shared_key = shared_training_key(pack, baseline_name, baseline_configs[baseline_name])
+        if shared_key is not None and (pool_key, shared_key) in shared_training_devices:
+            execution_device = shared_training_devices[(pool_key, shared_key)]
+        else:
+            slot_index = pool_counters.get(pool_key, 0)
+            execution_device = device_pool[slot_index % len(device_pool)]
+            pool_counters[pool_key] = slot_index + 1
+            if shared_key is not None:
+                shared_training_devices[(pool_key, shared_key)] = execution_device
         assigned_jobs.append(
             AssignedJob(
                 index=index,

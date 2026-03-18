@@ -8,17 +8,66 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
+from metadata.task_keys import (
+    chain_config_key,
+    composition_key,
+    order_key,
+)
+from .task_splits import (
+    UNSEEN_CHAIN_CONFIG_SPLIT_FIELD,
+    UNSEEN_COMPOSITION_SPLIT_FIELD,
+    UNSEEN_ORDER_SPLIT_FIELD,
+    has_task_specific_split,
+)
+
 CHAIN_FAMILIES = ("direct", "platform_like", "telephony", "simreplay", "hybrid")
+CURATED_CROSS_CHAIN_TRANSFERS = (
+    {
+        "train_family": "direct",
+        "test_family": "platform_like",
+        "motivation": "Canonical clean-to-platform transfer for distribution-channel robustness.",
+    },
+    {
+        "train_family": "direct",
+        "test_family": "telephony",
+        "motivation": "Canonical clean-to-telephony transfer for communication-channel robustness.",
+    },
+    {
+        "train_family": "direct",
+        "test_family": "simreplay",
+        "motivation": "Canonical clean-to-replay transfer for physical-channel robustness.",
+    },
+    {
+        "train_family": "direct",
+        "test_family": "hybrid",
+        "motivation": "Canonical clean-to-hybrid transfer for the most deployment-realistic composed shift.",
+    },
+    {
+        "train_family": "telephony",
+        "test_family": "simreplay",
+        "motivation": "Representative cross-mechanism transfer from communication artifacts to replay artifacts.",
+    },
+)
 IN_CHAIN_TASK = "in_chain"
 CROSS_CHAIN_TASK = "cross_chain"
-UNSEEN_COMPOSITION_TASK = "unseen_composition"
-UNSEEN_ORDER_TASK = "unseen_order"
+COMPOSITION_GENERALIZATION_TASK = "composition_generalization"
+ORDER_GENERALIZATION_TASK = "order_generalization"
+HELD_OUT_CHAIN_CONFIGURATION_TASK = "held_out_chain_configuration"
+SEEN_CONTROL_VARIANT = "seen_control"
+UNSEEN_HOLDOUT_VARIANT = "unseen_holdout"
 COUNTERFACTUAL_TASK = "counterfactual_consistency"
+REQUIRED_COUNTERFACTUAL_FAMILIES = ("direct", "platform_like", "telephony", "simreplay")
+SHARED_TRAINING_TASK_IDS = {
+    COMPOSITION_GENERALIZATION_TASK,
+    ORDER_GENERALIZATION_TASK,
+    HELD_OUT_CHAIN_CONFIGURATION_TASK,
+}
 TASK_IDS = (
     IN_CHAIN_TASK,
     CROSS_CHAIN_TASK,
-    UNSEEN_COMPOSITION_TASK,
-    UNSEEN_ORDER_TASK,
+    COMPOSITION_GENERALIZATION_TASK,
+    ORDER_GENERALIZATION_TASK,
+    HELD_OUT_CHAIN_CONFIGURATION_TASK,
     COUNTERFACTUAL_TASK,
 )
 
@@ -34,6 +83,10 @@ class TaskPack:
     dev_rows: list[dict[str, Any]] = field(default_factory=list)
     test_rows: list[dict[str, Any]] = field(default_factory=list)
     meta: dict[str, Any] = field(default_factory=dict)
+
+
+def _base_split(row: dict[str, Any]) -> str:
+    return str(row.get("split_standard", "")).strip()
 
 
 def _stable_row_token(row: dict[str, Any]) -> str:
@@ -53,6 +106,22 @@ def _sample_rows(rows: list[dict[str, Any]], ratio: float, *, salt: str) -> list
     if not rows or ratio >= 1.0:
         return rows
     target_size = _target_sample_size(len(rows), ratio)
+    ranked = sorted(
+        (
+            hashlib.sha1(f"{salt}\0{_stable_row_token(row)}".encode("utf-8")).hexdigest(),
+            index,
+        )
+        for index, row in enumerate(rows)
+    )
+    keep_indices = {index for _, index in ranked[:target_size]}
+    return [row for index, row in enumerate(rows) if index in keep_indices]
+
+
+def _sample_exact_rows(rows: list[dict[str, Any]], target_size: int, *, salt: str) -> list[dict[str, Any]]:
+    if not rows or target_size >= len(rows):
+        return rows
+    if target_size <= 0:
+        return []
     ranked = sorted(
         (
             hashlib.sha1(f"{salt}\0{_stable_row_token(row)}".encode("utf-8")).hexdigest(),
@@ -86,6 +155,32 @@ def _sample_grouped_rows(
     return [row for row in rows if group_key_fn(row) in keep_group_keys]
 
 
+def _sample_rows_by_group(
+    rows: list[dict[str, Any]],
+    ratio: float,
+    *,
+    salt: str,
+    group_key_fn,
+) -> list[dict[str, Any]]:
+    if not rows or ratio >= 1.0:
+        return rows
+    rows_by_group: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        rows_by_group[str(group_key_fn(row))].append(row)
+    sampled_rows: list[dict[str, Any]] = []
+    for group_key in sorted(rows_by_group):
+        group_rows = rows_by_group[group_key]
+        target_size = _target_sample_size(len(group_rows), ratio)
+        sampled_rows.extend(
+            _sample_exact_rows(
+                group_rows,
+                target_size,
+                salt=f"{salt}:{group_key}",
+            )
+        )
+    return sampled_rows
+
+
 def _counterfactual_meta(test_rows: list[dict[str, Any]]) -> dict[str, Any]:
     by_parent: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in test_rows:
@@ -97,41 +192,24 @@ def _counterfactual_meta(test_rows: list[dict[str, Any]]) -> dict[str, Any]:
     paired_parent_count = 0
     for parent_rows in by_parent.values():
         families = {_chain_family(row) for row in parent_rows}
-        if "direct" not in families or len(families) < 2:
+        if not set(REQUIRED_COUNTERFACTUAL_FAMILIES).issubset(families):
             continue
         paired_parent_count += 1
         family_coverage_histogram[len(families)] += 1
 
     return {
         "paired_test_parent_count": paired_parent_count,
+        "required_chain_families": list(REQUIRED_COUNTERFACTUAL_FAMILIES),
         "paired_test_family_coverage": {
             str(k): v for k, v in sorted(family_coverage_histogram.items())
         },
     }
 
 
-def _composition_key(operator_seq_value: Any) -> str:
-    try:
-        seq = json.loads(operator_seq_value) if isinstance(operator_seq_value, str) else operator_seq_value
-    except (json.JSONDecodeError, TypeError):
-        return ""
-    if not isinstance(seq, list):
-        return ""
-    return json.dumps(sorted(str(x) for x in seq), ensure_ascii=False, separators=(",", ":"))
-
-
-def _order_key(operator_seq_value: Any) -> str:
-    try:
-        seq = json.loads(operator_seq_value) if isinstance(operator_seq_value, str) else operator_seq_value
-    except (json.JSONDecodeError, TypeError):
-        return ""
-    if not isinstance(seq, list):
-        return ""
-    return json.dumps([str(x) for x in seq], ensure_ascii=False, separators=(",", ":"))
-
-
-def _rows_for_split(rows: list[dict[str, Any]], split: str) -> list[dict[str, Any]]:
-    return [row for row in rows if str(row.get("split")) == split]
+def _rows_for_split(rows: list[dict[str, Any]], split: str, split_field: str = "split") -> list[dict[str, Any]]:
+    if split_field == "split":
+        return [row for row in rows if _base_split(row) == split]
+    return [row for row in rows if str(row.get(split_field, "")).strip() == split]
 
 
 def _chain_family(row: dict[str, Any]) -> str:
@@ -142,51 +220,139 @@ def _supported_chain_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [row for row in rows if _chain_family(row) in CHAIN_FAMILIES]
 
 
-def _build_unseen_split_pack(
+def _nonempty_operator_key(row: dict[str, Any], key_fn) -> str:
+    key = key_fn(row)
+    return "" if key in {"", "[]"} else key
+
+
+def _derive_generalization_partitions(
     rows: list[dict[str, Any]],
     *,
-    task_id: str,
-    variant: str,
-    description: str,
     key_fn,
-    meta_key: str,
-) -> list[TaskPack]:
-    by_key: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in rows:
-        key = key_fn(row.get("operator_seq", "[]"))
-        if key and key != "[]":
-            by_key[key].append(row)
-
-    seen_keys: set[str] = set()
-    unseen_keys: set[str] = set()
-    for key, grouped_rows in by_key.items():
-        train_count = len(_rows_for_split(grouped_rows, "train"))
-        test_count = len(_rows_for_split(grouped_rows, "test"))
-        if test_count > 0 and train_count < 10:
-            unseen_keys.add(key)
-        elif train_count > 0:
-            seen_keys.add(key)
-
-    if not unseen_keys:
-        return []
-
-    train_rows = [row for row in _rows_for_split(rows, "train") if key_fn(row.get("operator_seq", "[]")) in seen_keys]
-    dev_rows = [row for row in _rows_for_split(rows, "dev") if key_fn(row.get("operator_seq", "[]")) in seen_keys]
-    test_rows = [row for row in _rows_for_split(rows, "test") if key_fn(row.get("operator_seq", "[]")) in unseen_keys]
-    if not train_rows or not test_rows:
-        return []
-
-    return [
-        TaskPack(
-            task_id=task_id,
-            variant=variant,
-            description=description,
-            train_rows=train_rows,
-            dev_rows=dev_rows,
-            test_rows=test_rows,
-            meta={meta_key: list(unseen_keys)[:10]},
+    split_field: str,
+    holdout_meta_key: str,
+    seen_meta_key: str,
+) -> dict[str, Any] | None:
+    if split_field != "split" and has_task_specific_split(rows, split_field):
+        usable_rows = [
+            row
+            for row in rows
+            if str(row.get(split_field, "")).strip() in {"train", "dev", "test"}
+        ]
+        train_rows = _rows_for_split(usable_rows, "train", split_field)
+        dev_rows = _rows_for_split(usable_rows, "dev", split_field)
+        unseen_test_rows = _rows_for_split(usable_rows, "test", split_field)
+        seen_candidate_rows = [
+            row
+            for row in _rows_for_split(rows, "test")
+            if str(row.get(split_field, "")).strip() == "" and _nonempty_operator_key(row, key_fn)
+        ]
+        holdout_keys = sorted(
+            {_nonempty_operator_key(row, key_fn) for row in unseen_test_rows if _nonempty_operator_key(row, key_fn)}
         )
+        seen_keys = sorted(
+            {_nonempty_operator_key(row, key_fn) for row in seen_candidate_rows if _nonempty_operator_key(row, key_fn)}
+        )
+        meta = {"split_field": split_field}
+    else:
+        by_key: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for row in rows:
+            key = _nonempty_operator_key(row, key_fn)
+            if key:
+                by_key[key].append(row)
+
+        seen_keys_set: set[str] = set()
+        unseen_keys_set: set[str] = set()
+        for key, grouped_rows in by_key.items():
+            train_count = len(_rows_for_split(grouped_rows, "train"))
+            test_count = len(_rows_for_split(grouped_rows, "test"))
+            if test_count > 0 and train_count < 10:
+                unseen_keys_set.add(key)
+            elif train_count > 0:
+                seen_keys_set.add(key)
+
+        if not seen_keys_set or not unseen_keys_set:
+            return None
+
+        train_rows = [row for row in _rows_for_split(rows, "train") if _nonempty_operator_key(row, key_fn) in seen_keys_set]
+        dev_rows = [row for row in _rows_for_split(rows, "dev") if _nonempty_operator_key(row, key_fn) in seen_keys_set]
+        unseen_test_rows = [
+            row for row in _rows_for_split(rows, "test") if _nonempty_operator_key(row, key_fn) in unseen_keys_set
+        ]
+        seen_candidate_rows = [
+            row for row in _rows_for_split(rows, "test") if _nonempty_operator_key(row, key_fn) in seen_keys_set
+        ]
+        holdout_keys = sorted(unseen_keys_set)
+        seen_keys = sorted(seen_keys_set)
+        meta = {}
+
+    if not train_rows or not unseen_test_rows or not seen_candidate_rows:
+        return None
+    return {
+        "train_rows": train_rows,
+        "dev_rows": dev_rows,
+        "unseen_test_rows": unseen_test_rows,
+        "seen_candidate_rows": seen_candidate_rows,
+        "meta": meta,
+        holdout_meta_key: holdout_keys,
+        seen_meta_key: seen_keys,
+    }
+
+
+def _family_balanced_seen_control_rows(
+    unseen_rows: list[dict[str, Any]],
+    seen_candidate_rows: list[dict[str, Any]],
+    *,
+    salt_prefix: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    unseen_by_family: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    seen_by_family: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in unseen_rows:
+        family = _chain_family(row)
+        if family:
+            unseen_by_family[family].append(row)
+    for row in seen_candidate_rows:
+        family = _chain_family(row)
+        if family:
+            seen_by_family[family].append(row)
+
+    comparison_families = sorted(set(unseen_by_family) & set(seen_by_family))
+    if not comparison_families:
+        return [], [], {
+            "comparison_chain_families": [],
+            "family_balance_reference_counts": {},
+            "family_balance_target_counts": {},
+            "family_balance_available_counts": {},
+        }
+
+    filtered_unseen_rows = [
+        row for family in comparison_families for row in unseen_by_family[family]
     ]
+    reference_counts = {family: len(unseen_by_family[family]) for family in comparison_families}
+    available_counts = {family: len(seen_by_family[family]) for family in comparison_families}
+    scale = min(1.0, min(available_counts[family] / reference_counts[family] for family in comparison_families))
+    target_counts = {
+        family: min(
+            available_counts[family],
+            max(1, int(reference_counts[family] * scale)),
+        )
+        for family in comparison_families
+    }
+    balanced_seen_rows: list[dict[str, Any]] = []
+    for family in comparison_families:
+        balanced_seen_rows.extend(
+            _sample_exact_rows(
+                seen_by_family[family],
+                target_counts[family],
+                salt=f"{salt_prefix}:{family}",
+            )
+        )
+    return filtered_unseen_rows, balanced_seen_rows, {
+        "comparison_chain_families": comparison_families,
+        "family_balance_reference_counts": {family: reference_counts[family] for family in comparison_families},
+        "family_balance_target_counts": {family: target_counts[family] for family in comparison_families},
+        "family_balance_available_counts": {family: available_counts[family] for family in comparison_families},
+    }
 
 
 def build_in_chain_packs(rows: list[dict[str, Any]]) -> list[TaskPack]:
@@ -220,59 +386,207 @@ def build_in_chain_packs(rows: list[dict[str, Any]]) -> list[TaskPack]:
 
 
 def build_cross_chain_packs(rows: list[dict[str, Any]]) -> list[TaskPack]:
-    """Train on one chain family and test on another."""
+    """Build a paper-oriented subset of representative cross-chain transfers."""
     packs: list[TaskPack] = []
     by_family: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         by_family[str(row.get("chain_family", ""))].append(row)
 
-    families = [f for f in CHAIN_FAMILIES if by_family.get(f)]
-    for train_family in families:
-        for test_family in families:
-            if train_family == test_family:
-                continue
-            train_rows = _rows_for_split(by_family[train_family], "train")
-            dev_rows = _rows_for_split(by_family[train_family], "dev")
-            test_rows = _rows_for_split(by_family[test_family], "test")
-            if not train_rows or not test_rows:
-                continue
-            variant = f"{train_family}_to_{test_family}"
-            packs.append(
-                TaskPack(
-                    task_id=CROSS_CHAIN_TASK,
-                    variant=variant,
-                    description=f"Cross-chain: train {train_family} → test {test_family}",
-                    train_rows=train_rows,
-                    dev_rows=dev_rows,
-                    test_rows=test_rows,
-                    meta={"train_chain_family": train_family, "test_chain_family": test_family},
-                )
+    # The paper only needs a compact set of interpretable transfer settings.
+    # We keep direct -> non-direct targets as the main clean-to-degraded axis,
+    # plus one communication-to-replay transfer explicitly called out in the plan.
+    for transfer in CURATED_CROSS_CHAIN_TRANSFERS:
+        train_family = transfer["train_family"]
+        test_family = transfer["test_family"]
+        if not by_family.get(train_family) or not by_family.get(test_family):
+            continue
+        train_rows = _rows_for_split(by_family[train_family], "train")
+        dev_rows = _rows_for_split(by_family[train_family], "dev")
+        test_rows = _rows_for_split(by_family[test_family], "test")
+        if not train_rows or not test_rows:
+            continue
+        variant = f"{train_family}_to_{test_family}"
+        packs.append(
+            TaskPack(
+                task_id=CROSS_CHAIN_TASK,
+                variant=variant,
+                description=f"Cross-chain: train {train_family} → test {test_family}",
+                train_rows=train_rows,
+                dev_rows=dev_rows,
+                test_rows=test_rows,
+                meta={
+                    "train_chain_family": train_family,
+                    "test_chain_family": test_family,
+                    "selection_motivation": transfer["motivation"],
+                },
             )
+        )
     return packs
 
 
-def build_unseen_composition_packs(rows: list[dict[str, Any]]) -> list[TaskPack]:
-    """Hold out some operator compositions for test."""
-    return _build_unseen_split_pack(
+def build_composition_generalization_packs(rows: list[dict[str, Any]]) -> list[TaskPack]:
+    """Seen vs held-out operator composition generalization."""
+    partitions = _derive_generalization_partitions(
         rows,
-        task_id=UNSEEN_COMPOSITION_TASK,
-        variant=UNSEEN_COMPOSITION_TASK,
-        description="Unseen composition generalization",
-        key_fn=_composition_key,
-        meta_key="unseen_composition_keys",
+        key_fn=composition_key,
+        split_field=UNSEEN_COMPOSITION_SPLIT_FIELD,
+        holdout_meta_key="holdout_keys",
+        seen_meta_key="seen_control_keys",
     )
+    if partitions is None:
+        return []
+    unseen_test_rows, seen_control_rows, balance_meta = _family_balanced_seen_control_rows(
+        partitions["unseen_test_rows"],
+        partitions["seen_candidate_rows"],
+        salt_prefix=COMPOSITION_GENERALIZATION_TASK,
+    )
+    if not unseen_test_rows or not seen_control_rows:
+        return []
+    return [
+        TaskPack(
+            task_id=COMPOSITION_GENERALIZATION_TASK,
+            variant=UNSEEN_HOLDOUT_VARIANT,
+            description="Composition generalization: unseen holdout",
+            train_rows=partitions["train_rows"],
+            dev_rows=partitions["dev_rows"],
+            test_rows=unseen_test_rows,
+            meta={
+                **partitions["meta"],
+                "comparison_variant": UNSEEN_HOLDOUT_VARIANT,
+                "shared_training_group": COMPOSITION_GENERALIZATION_TASK,
+                "holdout_keys": partitions["holdout_keys"],
+                **balance_meta,
+            },
+        ),
+        TaskPack(
+            task_id=COMPOSITION_GENERALIZATION_TASK,
+            variant=SEEN_CONTROL_VARIANT,
+            description="Composition generalization: seen control",
+            train_rows=partitions["train_rows"],
+            dev_rows=partitions["dev_rows"],
+            test_rows=seen_control_rows,
+            meta={
+                **partitions["meta"],
+                "comparison_variant": SEEN_CONTROL_VARIANT,
+                "paired_variant": UNSEEN_HOLDOUT_VARIANT,
+                "family_matched_control": True,
+                "family_balanced_control": True,
+                "shared_training_group": COMPOSITION_GENERALIZATION_TASK,
+                "seen_control_keys": partitions["seen_control_keys"],
+                **balance_meta,
+            },
+        ),
+    ]
 
 
-def build_unseen_order_packs(rows: list[dict[str, Any]]) -> list[TaskPack]:
-    """Hold out some operator orders for test."""
-    return _build_unseen_split_pack(
+def build_order_generalization_packs(rows: list[dict[str, Any]]) -> list[TaskPack]:
+    """Seen vs held-out operator order generalization."""
+    partitions = _derive_generalization_partitions(
         rows,
-        task_id=UNSEEN_ORDER_TASK,
-        variant=UNSEEN_ORDER_TASK,
-        description="Unseen order generalization",
-        key_fn=_order_key,
-        meta_key="unseen_order_keys",
+        key_fn=order_key,
+        split_field=UNSEEN_ORDER_SPLIT_FIELD,
+        holdout_meta_key="holdout_keys",
+        seen_meta_key="seen_control_keys",
     )
+    if partitions is None:
+        return []
+    unseen_test_rows, seen_control_rows, balance_meta = _family_balanced_seen_control_rows(
+        partitions["unseen_test_rows"],
+        partitions["seen_candidate_rows"],
+        salt_prefix=ORDER_GENERALIZATION_TASK,
+    )
+    if not unseen_test_rows or not seen_control_rows:
+        return []
+    return [
+        TaskPack(
+            task_id=ORDER_GENERALIZATION_TASK,
+            variant=UNSEEN_HOLDOUT_VARIANT,
+            description="Order generalization: unseen holdout",
+            train_rows=partitions["train_rows"],
+            dev_rows=partitions["dev_rows"],
+            test_rows=unseen_test_rows,
+            meta={
+                **partitions["meta"],
+                "comparison_variant": UNSEEN_HOLDOUT_VARIANT,
+                "shared_training_group": ORDER_GENERALIZATION_TASK,
+                "holdout_keys": partitions["holdout_keys"],
+                **balance_meta,
+            },
+        ),
+        TaskPack(
+            task_id=ORDER_GENERALIZATION_TASK,
+            variant=SEEN_CONTROL_VARIANT,
+            description="Order generalization: seen control",
+            train_rows=partitions["train_rows"],
+            dev_rows=partitions["dev_rows"],
+            test_rows=seen_control_rows,
+            meta={
+                **partitions["meta"],
+                "comparison_variant": SEEN_CONTROL_VARIANT,
+                "paired_variant": UNSEEN_HOLDOUT_VARIANT,
+                "family_matched_control": True,
+                "family_balanced_control": True,
+                "shared_training_group": ORDER_GENERALIZATION_TASK,
+                "seen_control_keys": partitions["seen_control_keys"],
+                **balance_meta,
+            },
+        ),
+    ]
+
+
+def build_chain_configuration_generalization_packs(rows: list[dict[str, Any]]) -> list[TaskPack]:
+    """Seen vs held-out chain-configuration generalization."""
+    partitions = _derive_generalization_partitions(
+        rows,
+        key_fn=chain_config_key,
+        split_field=UNSEEN_CHAIN_CONFIG_SPLIT_FIELD,
+        holdout_meta_key="holdout_keys",
+        seen_meta_key="seen_control_keys",
+    )
+    if partitions is None:
+        return []
+    unseen_test_rows, seen_control_rows, balance_meta = _family_balanced_seen_control_rows(
+        partitions["unseen_test_rows"],
+        partitions["seen_candidate_rows"],
+        salt_prefix=HELD_OUT_CHAIN_CONFIGURATION_TASK,
+    )
+    if not unseen_test_rows or not seen_control_rows:
+        return []
+    return [
+        TaskPack(
+            task_id=HELD_OUT_CHAIN_CONFIGURATION_TASK,
+            variant=UNSEEN_HOLDOUT_VARIANT,
+            description="Held-out chain configuration generalization: unseen holdout",
+            train_rows=partitions["train_rows"],
+            dev_rows=partitions["dev_rows"],
+            test_rows=unseen_test_rows,
+            meta={
+                **partitions["meta"],
+                "comparison_variant": UNSEEN_HOLDOUT_VARIANT,
+                "shared_training_group": HELD_OUT_CHAIN_CONFIGURATION_TASK,
+                "holdout_keys": partitions["holdout_keys"],
+                **balance_meta,
+            },
+        ),
+        TaskPack(
+            task_id=HELD_OUT_CHAIN_CONFIGURATION_TASK,
+            variant=SEEN_CONTROL_VARIANT,
+            description="Held-out chain configuration generalization: seen control",
+            train_rows=partitions["train_rows"],
+            dev_rows=partitions["dev_rows"],
+            test_rows=seen_control_rows,
+            meta={
+                **partitions["meta"],
+                "comparison_variant": SEEN_CONTROL_VARIANT,
+                "paired_variant": UNSEEN_HOLDOUT_VARIANT,
+                "family_matched_control": True,
+                "family_balanced_control": True,
+                "shared_training_group": HELD_OUT_CHAIN_CONFIGURATION_TASK,
+                "seen_control_keys": partitions["seen_control_keys"],
+                **balance_meta,
+            },
+        ),
+    ]
 
 
 def build_counterfactual_packs(rows: list[dict[str, Any]]) -> list[TaskPack]:
@@ -292,7 +606,7 @@ def build_counterfactual_packs(rows: list[dict[str, Any]]) -> list[TaskPack]:
     family_coverage_histogram: Counter[int] = Counter()
     for parent_rows in by_parent.values():
         families = {_chain_family(row) for row in parent_rows}
-        if "direct" not in families or len(families) < 2:
+        if not set(REQUIRED_COUNTERFACTUAL_FAMILIES).issubset(families):
             continue
         family_coverage_histogram[len(families)] += 1
         test_rows.extend(sorted(parent_rows, key=lambda row: (_chain_family(row), str(row.get("sample_id", "")))))
@@ -311,6 +625,7 @@ def build_counterfactual_packs(rows: list[dict[str, Any]]) -> list[TaskPack]:
             meta={
                 "reference_chain_family": "direct",
                 "chain_families": list(CHAIN_FAMILIES),
+                "required_chain_families": list(REQUIRED_COUNTERFACTUAL_FAMILIES),
                 "paired_test_parent_count": sum(family_coverage_histogram.values()),
                 "paired_test_family_coverage": {
                     str(k): v for k, v in sorted(family_coverage_histogram.items())
@@ -323,8 +638,9 @@ def build_counterfactual_packs(rows: list[dict[str, Any]]) -> list[TaskPack]:
 TASK_BUILDERS = {
     IN_CHAIN_TASK: build_in_chain_packs,
     CROSS_CHAIN_TASK: build_cross_chain_packs,
-    UNSEEN_COMPOSITION_TASK: build_unseen_composition_packs,
-    UNSEEN_ORDER_TASK: build_unseen_order_packs,
+    COMPOSITION_GENERALIZATION_TASK: build_composition_generalization_packs,
+    ORDER_GENERALIZATION_TASK: build_order_generalization_packs,
+    HELD_OUT_CHAIN_CONFIGURATION_TASK: build_chain_configuration_generalization_packs,
     COUNTERFACTUAL_TASK: build_counterfactual_packs,
 }
 
@@ -348,15 +664,20 @@ def _truncate_pack(
 
 
 def _sample_pack(pack: TaskPack, sample_ratio: float) -> TaskPack:
+    train_dev_scope = (
+        str(pack.meta.get("shared_training_group", "")).strip() or pack.task_id
+        if pack.task_id in SHARED_TRAINING_TASK_IDS
+        else f"{pack.task_id}:{pack.variant}"
+    )
     train_rows = _sample_rows(
         pack.train_rows,
         sample_ratio,
-        salt=f"{pack.task_id}:{pack.variant}:train",
+        salt=f"{train_dev_scope}:train",
     )
     dev_rows = _sample_rows(
         pack.dev_rows,
         sample_ratio,
-        salt=f"{pack.task_id}:{pack.variant}:dev",
+        salt=f"{train_dev_scope}:dev",
     )
     if pack.task_id == COUNTERFACTUAL_TASK:
         test_rows = _sample_grouped_rows(
@@ -366,6 +687,14 @@ def _sample_pack(pack: TaskPack, sample_ratio: float) -> TaskPack:
             group_key_fn=lambda row: str(row.get("parent_id", "")).strip() or _stable_row_token(row),
         )
         meta = {**pack.meta, **_counterfactual_meta(test_rows), "sample_ratio": sample_ratio}
+    elif pack.task_id in SHARED_TRAINING_TASK_IDS:
+        test_rows = _sample_rows_by_group(
+            pack.test_rows,
+            sample_ratio,
+            salt=f"{pack.task_id}:{pack.variant}:test",
+            group_key_fn=_chain_family,
+        )
+        meta = {**pack.meta, "sample_ratio": sample_ratio}
     else:
         test_rows = _sample_rows(
             pack.test_rows,

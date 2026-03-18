@@ -99,6 +99,34 @@ def _enrich_scores(
     return merged_rows
 
 
+def _validate_score_coverage(scores: list[dict[str, Any]], task_pack: TaskPack | None) -> None:
+    if task_pack is None:
+        return
+    expected_ids = [
+        (row.get("sample_id") or "").strip()
+        for row in task_pack.test_rows
+        if (row.get("sample_id") or "").strip()
+    ]
+    if not expected_ids:
+        return
+    seen_counts: dict[str, int] = defaultdict(int)
+    unexpected_ids: set[str] = set()
+    for row in scores:
+        sample_id = (row.get("sample_id") or "").strip()
+        if not sample_id:
+            continue
+        seen_counts[sample_id] += 1
+        if sample_id not in expected_ids:
+            unexpected_ids.add(sample_id)
+    duplicate_ids = sorted(sample_id for sample_id, count in seen_counts.items() if count > 1)
+    missing_ids = sorted(sample_id for sample_id in expected_ids if seen_counts.get(sample_id, 0) == 0)
+    if duplicate_ids or missing_ids or unexpected_ids:
+        raise ValueError(
+            "scores.csv coverage mismatch: "
+            f"missing={len(missing_ids)} duplicate={len(duplicate_ids)} unexpected={len(unexpected_ids)}"
+        )
+
+
 def compute_eer_from_labels(labels: np.ndarray, predictions: np.ndarray) -> tuple[float, float]:
     """Compute EER and its threshold from binary labels and positive-class scores."""
     if labels.size == 0 or predictions.size == 0 or labels.size != predictions.size:
@@ -283,12 +311,19 @@ def compute_metrics_for_scores(
         label_map=label_map,
         metadata_rows=task_pack.test_rows if task_pack is not None else None,
     )
+    _validate_score_coverage(scores, task_pack)
     binary_scores = _binary_scores(scores, "score", "label")
+    calibrated_threshold = 0.5
+    if binary_scores:
+        labels = np.array([label for _, label in binary_scores], dtype=np.int32)
+        predictions = np.array([score for score, _ in binary_scores], dtype=np.float64)
+        _, calibrated_threshold = compute_eer_from_labels(labels, predictions)
     metrics: dict[str, float | int | str] = {
         "eer": _compute_eer_from_binary_scores(binary_scores),
         "auc": _compute_auc_from_binary_scores(binary_scores),
-        "accuracy": _compute_accuracy_from_binary_scores(binary_scores, 0.5),
-        "f1": _compute_f1_from_binary_scores(binary_scores, 0.5),
+        "accuracy": _compute_accuracy_from_binary_scores(binary_scores, calibrated_threshold),
+        "f1": _compute_f1_from_binary_scores(binary_scores, calibrated_threshold),
+        "calibrated_threshold": calibrated_threshold,
         "n_samples": len(scores),
     }
     if task_pack is not None and task_pack.task_id == COUNTERFACTUAL_TASK:

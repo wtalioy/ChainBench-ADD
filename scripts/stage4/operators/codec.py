@@ -16,6 +16,7 @@ def _roundtrip_codec(
     codec: str,
     bitrate: str | None = None,
     encode_sample_rate: int | None = None,
+    decode_sample_rate: int | None = None,
 ) -> None:
     codec = codec.lower()
     encoded_path: Path
@@ -27,12 +28,12 @@ def _roundtrip_codec(
         command.extend(["-ar", str(encode_sample_rate)])
     if codec == "aac":
         encoded_path = output_path.with_name(f"{output_path.stem}__encoded.m4a")
-        command.extend(["-c:a", "aac"])
+        command.extend(["-c:a", "aac", "-movflags", "+faststart"])
         if bitrate:
             command.extend(["-b:a", bitrate])
     elif codec == "opus":
         encoded_path = output_path.with_name(f"{output_path.stem}__encoded.ogg")
-        command.extend(["-c:a", "libopus"])
+        command.extend(["-c:a", "libopus", "-application", "voip", "-vbr", "on"])
         if bitrate:
             command.extend(["-b:a", bitrate])
     elif codec == "pcm_mulaw":
@@ -54,9 +55,11 @@ def _roundtrip_codec(
         cmd_dec = [
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
             "-i", str(encoded_path),
-            "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
-            str(output_path),
+            "-ac", "1",
         ]
+        if decode_sample_rate is not None:
+            cmd_dec.extend(["-ar", str(decode_sample_rate)])
+        cmd_dec.extend(["-c:a", "pcm_s16le", str(output_path)])
         r_dec = run_command(cmd_dec)
         if r_dec.returncode != 0:
             raise RuntimeError(r_dec.stderr.strip() or f"ffmpeg decode failed for {codec}")
@@ -85,12 +88,15 @@ class CodecOperator(DeliveryOperator):
         codec = params["codec"]
         bitrate = params.get("bitrate")
         encode_sample_rate = params.get("encode_sample_rate")
+        decode_sample_rate = params.get("decode_sample_rate", encode_sample_rate)
         metadata["codec"] = codec
         if bitrate:
             metadata["bitrate"] = bitrate
         if encode_sample_rate:
             metadata["encode_sample_rate"] = encode_sample_rate
-        _roundtrip_codec(input_path, output_path, codec, bitrate, encode_sample_rate)
+        if decode_sample_rate:
+            metadata["decode_sample_rate"] = decode_sample_rate
+        _roundtrip_codec(input_path, output_path, codec, bitrate, encode_sample_rate, decode_sample_rate)
 
 
 class ReEncodeOperator(DeliveryOperator):
@@ -115,9 +121,12 @@ class ReEncodeOperator(DeliveryOperator):
             codec = params.get("default_codec", "aac")
         bitrate = params.get("bitrate")
         encode_sample_rate = params.get("encode_sample_rate")
+        decode_sample_rate = params.get("decode_sample_rate", encode_sample_rate)
         metadata["codec"] = codec
         if bitrate:
             metadata["bitrate"] = bitrate
         if encode_sample_rate:
             metadata["encode_sample_rate"] = encode_sample_rate
-        _roundtrip_codec(input_path, output_path, codec, bitrate, encode_sample_rate)
+        if decode_sample_rate:
+            metadata["decode_sample_rate"] = decode_sample_rate
+        _roundtrip_codec(input_path, output_path, codec, bitrate, encode_sample_rate, decode_sample_rate)

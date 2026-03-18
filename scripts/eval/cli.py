@@ -24,7 +24,7 @@ LOGGER = get_logger("eval")
 def _apply_smoke_mode(rows: list[dict[str, Any]], config: dict[str, Any], smoke_limit: int = 500) -> list[dict[str, Any]]:
     by_split: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
-        split = str(row.get("split", "")).strip() or "train"
+        split = str(row.get("split_standard", "")).strip() or "train"
         by_split.setdefault(split, []).append(row)
 
     per_split = max(1, smoke_limit // 3)

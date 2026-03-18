@@ -6,10 +6,10 @@ import argparse
 import json
 import sys
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Iterable
 
 from tqdm.auto import tqdm
 
@@ -19,33 +19,68 @@ from lib.logging import get_logger, setup_logging
 
 from .export import export_single_audio
 from .protocols import (
+    UNSEEN_CHAIN_CONFIG_SPLIT_FIELD,
+    UNSEEN_COMPOSITION_SPLIT_FIELD,
+    UNSEEN_ORDER_SPLIT_FIELD,
     annotate_rows,
     check_speaker_disjoint,
     summarize_parent_coverage,
+    summarize_task_splits,
 )
 from .validate import summarize_validation_rows, validate_single_row
 
 
 LOGGER = get_logger("stage5")
 DEFAULT_COVERAGE_CHAIN_FAMILIES = ["direct", "platform_like", "telephony", "simreplay", "hybrid"]
+STANDARD_SPLIT_EXPORT_FIELD = "split_standard"
 RELEASE_METADATA_FIELD_ORDER = [
+    # Identity and paths
     "sample_id",
+    "parent_id",
     "audio_path",
+    "clean_parent_path",
+    "trace_path",
+    # Labels and evaluation splits
     "label",
-    "split",
+    STANDARD_SPLIT_EXPORT_FIELD,
+    UNSEEN_COMPOSITION_SPLIT_FIELD,
+    UNSEEN_ORDER_SPLIT_FIELD,
+    UNSEEN_CHAIN_CONFIG_SPLIT_FIELD,
+    # Source/content metadata
     "language",
     "speaker_id",
-    "parent_id",
+    "source_speaker_id",
+    "utterance_id",
+    "transcript",
+    "raw_transcript",
     "source_corpus",
     "license_tag",
+    # Generator metadata
     "generator_family",
+    "generator_name",
+    # Delivery-chain metadata
     "chain_family",
+    "chain_template_id",
+    "chain_variant_index",
     "operator_seq",
     "chain_config",
     "operator_params",
+    "codec",
+    "bitrate",
+    "packet_loss",
+    "bandwidth_mode",
+    "snr",
+    "rt60",
+    "rir_backend",
+    "room_dim",
+    "distance",
     "seed",
+    # Audio stats
     "duration_sec",
     "sample_rate",
+    "channels",
+    "codec_name",
+    "sample_fmt",
 ]
 
 
@@ -182,13 +217,58 @@ def make_failure_record(row: dict[str, Any], status: str, error: str | None) -> 
 
 
 def build_release_metadata_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [
-        {
-            field: row.get("chain_config", "[]") if field == "chain_config" else row.get(field, "")
-            for field in RELEASE_METADATA_FIELD_ORDER
+    metadata_rows: list[dict[str, Any]] = []
+    for row in rows:
+        metadata_row = {
+            "sample_id": row.get("sample_id", ""),
+            "parent_id": row.get("parent_id", ""),
+            "audio_path": row.get("audio_path", ""),
+            "clean_parent_path": row.get("clean_parent_path", ""),
+            "trace_path": row.get("trace_path", ""),
+            "label": row.get("label", ""),
+            STANDARD_SPLIT_EXPORT_FIELD: row.get("split", ""),
+            UNSEEN_COMPOSITION_SPLIT_FIELD: row.get(UNSEEN_COMPOSITION_SPLIT_FIELD, ""),
+            UNSEEN_ORDER_SPLIT_FIELD: row.get(UNSEEN_ORDER_SPLIT_FIELD, ""),
+            UNSEEN_CHAIN_CONFIG_SPLIT_FIELD: row.get(UNSEEN_CHAIN_CONFIG_SPLIT_FIELD, ""),
+            "language": row.get("language", ""),
+            "speaker_id": row.get("speaker_id", ""),
+            "source_speaker_id": row.get("source_speaker_id", ""),
+            "utterance_id": row.get("utterance_id", ""),
+            "transcript": row.get("transcript", ""),
+            "raw_transcript": row.get("raw_transcript", ""),
+            "source_corpus": row.get("source_corpus", ""),
+            "license_tag": row.get("license_tag", ""),
+            "generator_family": row.get("generator_family", ""),
+            "generator_name": row.get("generator_name", ""),
+            "chain_family": row.get("chain_family", ""),
+            "chain_template_id": row.get("chain_template_id", ""),
+            "chain_variant_index": row.get("chain_variant_index", ""),
+            "operator_seq": row.get("operator_seq", ""),
+            "chain_config": row.get("chain_config", "[]"),
+            "operator_params": row.get("operator_params", ""),
+            "codec": row.get("codec", ""),
+            "bitrate": row.get("bitrate", ""),
+            "packet_loss": row.get("packet_loss", ""),
+            "bandwidth_mode": row.get("bandwidth_mode", ""),
+            "snr": row.get("snr", ""),
+            "rt60": row.get("rt60", ""),
+            "rir_backend": row.get("rir_backend", ""),
+            "room_dim": row.get("room_dim", ""),
+            "distance": row.get("distance", ""),
+            "seed": row.get("seed", ""),
+            "duration_sec": row.get("duration_sec", ""),
+            "sample_rate": row.get("sample_rate", ""),
+            "channels": row.get("channels", ""),
+            "codec_name": row.get("codec_name", ""),
+            "sample_fmt": row.get("sample_fmt", ""),
         }
-        for row in rows
-    ]
+        metadata_rows.append(
+            {
+                field: metadata_row.get(field, "")
+                for field in RELEASE_METADATA_FIELD_ORDER
+            }
+        )
+    return metadata_rows
 
 
 def load_selected_rows(
@@ -211,6 +291,75 @@ def load_selected_rows(
     return rows
 
 
+def _consume_results(
+    pending: set[Future],
+    *,
+    counts: Counter,
+    progress: Any,
+    completed: int,
+    log_every: int,
+    on_result: Callable[[Any], None],
+    progress_postfix: Callable[[int], dict[str, Any]],
+) -> int:
+    done, still_pending = wait(pending, return_when=FIRST_COMPLETED)
+    pending.clear()
+    pending.update(still_pending)
+    for future in done:
+        completed += 1
+        result = future.result()
+        counts[result.status] += 1
+        on_result(result)
+        progress.update(1)
+        if completed <= 5 or completed % log_every == 0:
+            progress.set_postfix(**progress_postfix(completed))
+    return completed
+
+
+def _run_bounded_tasks(
+    items: Iterable[dict[str, Any]],
+    total: int,
+    *,
+    workers: int,
+    desc: str,
+    unit: str,
+    submit_fn: Callable[[ThreadPoolExecutor, dict[str, Any]], Future],
+    on_result: Callable[[Any], None],
+    counts: Counter,
+    log_every: int,
+    progress_postfix: Callable[[int], dict[str, Any]],
+) -> None:
+    in_flight_limit = max(1, workers * 2)
+    item_iter = iter(items)
+    pending: set[Future] = set()
+
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
+        for _ in range(min(in_flight_limit, total)):
+            item = next(item_iter, None)
+            if item is None:
+                break
+            pending.add(submit_fn(executor, item))
+
+        with tqdm(total=total, desc=desc, unit=unit, dynamic_ncols=True) as progress:
+            completed = 0
+            while pending:
+                completed = _consume_results(
+                    pending,
+                    counts=counts,
+                    progress=progress,
+                    completed=completed,
+                    log_every=log_every,
+                    on_result=on_result,
+                    progress_postfix=progress_postfix,
+                )
+                while len(pending) < in_flight_limit:
+                    item = next(item_iter, None)
+                    if item is None:
+                        break
+                    pending.add(submit_fn(executor, item))
+            if total > 0 and (completed <= 5 or completed % log_every != 0):
+                progress.set_postfix(**progress_postfix(completed))
+
+
 def validate_dataset_rows(
     rows: list[dict[str, Any]],
     config: dict[str, Any],
@@ -221,25 +370,25 @@ def validate_dataset_rows(
     prepared_rows: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     counts = Counter()
-    with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
-        future_map = {
-            executor.submit(validate_single_row, row, config, workspace_root): row for row in rows
-        }
-        total = len(future_map)
-        with tqdm(total=total, desc="stage5 validate", unit="file", dynamic_ncols=True) as progress:
-            for idx, future in enumerate(as_completed(future_map), start=1):
-                result = future.result()
-                counts[result.status] += 1
-                if result.ok:
-                    prepared_rows.append(dict(result.input_row))
-                else:
-                    failures.append(make_failure_record(result.input_row, result.status, result.error))
-                progress.update(1)
-                if idx <= 5 or idx % log_every == 0 or idx == total:
-                    progress.set_postfix(
-                        kept=len(prepared_rows),
-                        failed=idx - len(prepared_rows),
-                    )
+    _run_bounded_tasks(
+        rows,
+        len(rows),
+        workers=workers,
+        desc="stage5 validate",
+        unit="file",
+        submit_fn=lambda executor, row: executor.submit(validate_single_row, row, config, workspace_root),
+        on_result=lambda result: (
+            prepared_rows.append(dict(result.input_row))
+            if result.ok
+            else failures.append(make_failure_record(result.input_row, result.status, result.error))
+        ),
+        counts=counts,
+        log_every=log_every,
+        progress_postfix=lambda completed: {
+            "kept": len(prepared_rows),
+            "failed": completed - len(prepared_rows),
+        },
+    )
     return prepared_rows, failures, counts
 
 
@@ -268,27 +417,28 @@ def export_dataset_audio(
     exported_rows: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     counts = Counter()
-    with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
-        future_map = {
-            executor.submit(export_single_audio, row, workspace_root, dataset_root, overwrite): row
-            for row in rows
-        }
-        total = len(future_map)
-        with tqdm(total=total, desc="stage5 export", unit="audio", dynamic_ncols=True) as progress:
-            for idx, future in enumerate(as_completed(future_map), start=1):
-                result = future.result()
-                counts[result.status] += 1
-                if result.ok and result.output_row is not None:
-                    exported_rows.append(result.output_row)
-                else:
-                    failures.append(make_failure_record(result.input_row, result.status, result.error))
-                progress.update(1)
-                if idx <= 5 or idx % log_every == 0 or idx == total:
-                    progress.set_postfix(
-                        copied=counts["exported_audio"],
-                        skipped=counts["skipped_existing_audio"],
-                        failed=idx - (counts["exported_audio"] + counts["skipped_existing_audio"]),
-                    )
+    _run_bounded_tasks(
+        rows,
+        len(rows),
+        workers=workers,
+        desc="stage5 export",
+        unit="audio",
+        submit_fn=lambda executor, row: executor.submit(
+            export_single_audio, row, workspace_root, dataset_root, overwrite
+        ),
+        on_result=lambda result: (
+            exported_rows.append(result.output_row)
+            if result.ok and result.output_row is not None
+            else failures.append(make_failure_record(result.input_row, result.status, result.error))
+        ),
+        counts=counts,
+        log_every=log_every,
+        progress_postfix=lambda completed: {
+            "copied": counts["exported_audio"],
+            "skipped": counts["skipped_existing_audio"],
+            "failed": completed - (counts["exported_audio"] + counts["skipped_existing_audio"]),
+        },
+    )
     return exported_rows, failures, counts
 
 
@@ -367,6 +517,7 @@ def main() -> int:
         "status_counts": dict(counts),
         "speaker_disjoint_check": check_speaker_disjoint(annotated_rows),
         "counterfactual_parent_coverage": summarize_parent_coverage(annotated_rows, coverage_families),
+        "task_specific_splits": summarize_task_splits(annotated_rows),
         "duplicate_checks": summarize_duplicates(annotated_rows),
         "stats": summarize_validation_rows(annotated_rows),
         "stats_tables": stats_tables,

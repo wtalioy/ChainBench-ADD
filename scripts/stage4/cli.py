@@ -7,10 +7,10 @@ import json
 import os
 import sys
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from lib.logging import get_logger, setup_logging
 from tqdm.auto import tqdm
@@ -18,7 +18,7 @@ from tqdm.auto import tqdm
 from lib.config import load_json, relative_to_workspace, resolve_path
 from lib.io import load_csv_rows, write_csv
 
-from .chains import sample_jobs
+from .chains import count_jobs, iter_sample_jobs
 from .render import build_manifest_row, render_single_job, summarize_manifest
 
 
@@ -86,6 +86,84 @@ def resolve_worker_count(args_workers: int, config: dict[str, Any]) -> int:
     return max(1, min(8, cpu_count))
 
 
+def _consume_render_result(
+    result: dict[str, Any],
+    manifest_rows: list[dict[str, Any]],
+    failures: list[dict[str, Any]],
+    counts: Counter,
+    workspace_root: Path,
+) -> None:
+    job = result["job"]
+    counts[result["status"]] += 1
+    if result["status"] in {"ok", "skipped_existing"}:
+        manifest_rows.append(build_manifest_row(job, result, workspace_root))
+        return
+    failures.append(
+        {
+            "job_id": job["job_id"],
+            "sample_id": job["sample_id"],
+            "parent_id": job["parent_id"],
+            "chain_family": job["family_name"],
+            "chain_template_id": job["template_id"],
+            "error": result["error"],
+        }
+    )
+
+
+def _render_jobs(
+    jobs: Iterable[dict[str, Any]],
+    total: int,
+    config: dict[str, Any],
+    workspace_root: Path,
+    output_root: Path,
+    workers: int,
+    log_every: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], Counter]:
+    manifest_rows: list[dict[str, Any]] = []
+    failures: list[dict[str, Any]] = []
+    counts: Counter = Counter()
+    in_flight_limit = max(1, workers * 2)
+    job_iter = iter(jobs)
+    pending: set[Future] = set()
+
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
+        for _ in range(min(in_flight_limit, total)):
+            job = next(job_iter, None)
+            if job is None:
+                break
+            pending.add(executor.submit(render_single_job, job, config, workspace_root, output_root))
+
+        with tqdm(total=total, desc="stage4 render", unit="job", dynamic_ncols=True) as progress:
+            completed = 0
+            while pending:
+                done, pending = wait(pending, return_when=FIRST_COMPLETED)
+                for future in done:
+                    completed += 1
+                    _consume_render_result(
+                        future.result(),
+                        manifest_rows,
+                        failures,
+                        counts,
+                        workspace_root,
+                    )
+                    progress.update(1)
+                    if completed <= 5 or completed % log_every == 0 or completed == total:
+                        progress.set_postfix(
+                            ok=counts["ok"],
+                            skipped=counts["skipped_existing"],
+                            failed=counts["failed"],
+                        )
+                while len(pending) < in_flight_limit:
+                    job = next(job_iter, None)
+                    if job is None:
+                        break
+                    pending.add(
+                        executor.submit(render_single_job, job, config, workspace_root, output_root)
+                    )
+
+    return manifest_rows, failures, counts
+
+
 def main() -> int:
     args = parse_args()
     setup_logging(args.log_level)
@@ -113,15 +191,16 @@ def main() -> int:
     ]
     LOGGER.info("selected chain families: %s", ", ".join(selected_families))
 
-    jobs = sample_jobs(rows, config, selected_families, workspace_root)
+    jobs_per_family = count_jobs(rows, config, selected_families)
+    jobs_total = sum(jobs_per_family.values())
     plan = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "config_path": relative_to_workspace(config_path, workspace_root),
         "input_manifest": relative_to_workspace(input_manifest_path, workspace_root),
         "input_clean_parents": len(rows),
         "selected_families": selected_families,
-        "jobs_total": len(jobs),
-        "jobs_per_family": dict(Counter(job["family_name"] for job in jobs)),
+        "jobs_total": jobs_total,
+        "jobs_per_family": dict(jobs_per_family),
     }
     jobs_dir = output_root / "jobs"
     jobs_dir.mkdir(parents=True, exist_ok=True)
@@ -133,43 +212,19 @@ def main() -> int:
         LOGGER.info("plan-only mode: wrote job plan to %s", jobs_dir / "stage4_job_plan.json")
         return 0
 
+    jobs = iter_sample_jobs(rows, config, selected_families, workspace_root)
+
     workers = resolve_worker_count(args.workers, config)
     LOGGER.info("using %d worker(s)", workers)
-    manifest_rows: list[dict[str, Any]] = []
-    failures: list[dict[str, Any]] = []
-    counts = Counter()
-
-    with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
-        future_map = {
-            executor.submit(render_single_job, job, config, workspace_root, output_root): job
-            for job in jobs
-        }
-        total = len(future_map)
-        with tqdm(total=total, desc="stage4 render", unit="job", dynamic_ncols=True) as progress:
-            for idx, future in enumerate(as_completed(future_map), start=1):
-                result = future.result()
-                job = result["job"]
-                counts[result["status"]] += 1
-                if result["status"] in {"ok", "skipped_existing"}:
-                    manifest_rows.append(build_manifest_row(job, result, workspace_root))
-                else:
-                    failures.append(
-                        {
-                            "job_id": job["job_id"],
-                            "sample_id": job["sample_id"],
-                            "parent_id": job["parent_id"],
-                            "chain_family": job["family_name"],
-                            "chain_template_id": job["template_id"],
-                            "error": result["error"],
-                        }
-                    )
-                progress.update(1)
-                if idx <= 5 or idx % args.log_every == 0 or idx == total:
-                    progress.set_postfix(
-                        ok=counts["ok"],
-                        skipped=counts["skipped_existing"],
-                        failed=counts["failed"],
-                    )
+    manifest_rows, failures, counts = _render_jobs(
+        jobs,
+        jobs_total,
+        config,
+        workspace_root,
+        output_root,
+        workers,
+        args.log_every,
+    )
 
     if not manifest_rows:
         raise RuntimeError("Stage-4 produced zero delivered samples")
@@ -197,7 +252,7 @@ def main() -> int:
         "input_manifest": relative_to_workspace(input_manifest_path, workspace_root),
         "output_root": relative_to_workspace(output_root, workspace_root),
         "input_clean_parents": len(rows),
-        "jobs_total": len(jobs),
+        "jobs_total": jobs_total,
         "delivered_samples": len(manifest_rows),
         "failed_jobs": len(failures),
         "status_counts": dict(counts),

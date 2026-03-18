@@ -11,6 +11,7 @@ from .codec import CodecOperator, ReEncodeOperator
 from .noise import NoiseOperator
 from .packet_loss import PacketLossOperator
 from .resample import ResampleOperator
+from .telephony_session import TelephonySessionOperator
 from .rir import RIROperator
 
 OPERATOR_REGISTRY: dict[str, type[DeliveryOperator]] = {
@@ -20,6 +21,7 @@ OPERATOR_REGISTRY: dict[str, type[DeliveryOperator]] = {
     "reencode": ReEncodeOperator,
     "packet_loss": PacketLossOperator,
     "noise": NoiseOperator,
+    "telephony_session": TelephonySessionOperator,
     "rir": RIROperator,
 }
 OPERATOR_INSTANCES: dict[str, DeliveryOperator] = {
@@ -64,5 +66,6 @@ __all__ = [
     "ReEncodeOperator",
     "PacketLossOperator",
     "NoiseOperator",
+    "TelephonySessionOperator",
     "RIROperator",
 ]

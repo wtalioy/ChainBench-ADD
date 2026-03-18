@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -39,9 +40,32 @@ def validate_probe(probe: dict[str, Any], validation_cfg: dict[str, Any]) -> str
 
 
 def inspect_audio_samples(path: Path, clip_threshold: float) -> dict[str, Any]:
-    audio, _sample_rate = sf.read(path, dtype="float32", always_2d=False)
-    samples = np.asarray(audio, dtype=np.float32)
-    if samples.size == 0:
+    peak_abs = 0.0
+    clipped_samples = 0
+    finite_samples_total = 0
+    contains_nan = False
+    contains_inf = False
+    num_frames = 0
+
+    with sf.SoundFile(path, "r") as audio_file:
+        for block in audio_file.blocks(blocksize=65536, dtype="float32", always_2d=False):
+            samples = np.asarray(block, dtype=np.float32)
+            if samples.size == 0:
+                continue
+            num_frames += int(samples.shape[0]) if samples.ndim > 0 else 0
+            contains_nan = contains_nan or bool(np.isnan(samples).any())
+            contains_inf = contains_inf or bool(np.isinf(samples).any())
+            finite_mask = np.isfinite(samples)
+            finite_count = int(finite_mask.sum())
+            finite_samples_total += finite_count
+            if finite_count == 0:
+                continue
+            finite_values = samples[finite_mask]
+            abs_values = np.abs(finite_values)
+            peak_abs = max(peak_abs, float(np.max(abs_values)))
+            clipped_samples += int(np.count_nonzero(abs_values >= clip_threshold))
+
+    if num_frames == 0:
         return {
             "peak_abs": 0.0,
             "clipped_fraction": 0.0,
@@ -50,17 +74,11 @@ def inspect_audio_samples(path: Path, clip_threshold: float) -> dict[str, Any]:
             "num_frames": 0,
         }
 
-    contains_nan = bool(np.isnan(samples).any())
-    contains_inf = bool(np.isinf(samples).any())
-    finite_mask = np.isfinite(samples)
-    finite_samples = samples[finite_mask]
-    if finite_samples.size == 0:
+    if finite_samples_total == 0:
         peak_abs = float("inf")
         clipped_fraction = 1.0
     else:
-        peak_abs = float(np.max(np.abs(finite_samples)))
-        clipped_fraction = float(np.mean(np.abs(finite_samples) >= clip_threshold))
-    num_frames = int(samples.shape[0]) if samples.ndim > 0 else 0
+        clipped_fraction = float(clipped_samples / finite_samples_total)
     return {
         "peak_abs": peak_abs,
         "clipped_fraction": clipped_fraction,
@@ -68,6 +86,14 @@ def inspect_audio_samples(path: Path, clip_threshold: float) -> dict[str, Any]:
         "contains_inf": contains_inf,
         "num_frames": num_frames,
     }
+
+
+@lru_cache(maxsize=16384)
+def _probe_duration_cached(path_str: str, timeout_sec: int) -> float | None:
+    parent_probe = ffprobe_audio(path_str, timeout_sec=timeout_sec)
+    if parent_probe is None:
+        return None
+    return float(parent_probe["duration"])
 
 
 def probe_parent_duration(
@@ -81,10 +107,7 @@ def probe_parent_duration(
     parent_path = resolve_path(parent_path_value, workspace_root)
     if not parent_path.exists():
         return None
-    parent_probe = ffprobe_audio(parent_path, timeout_sec=timeout_sec)
-    if parent_probe is None:
-        return None
-    return float(parent_probe["duration"])
+    return _probe_duration_cached(str(parent_path), timeout_sec)
 
 
 def validate_single_row(

@@ -23,11 +23,10 @@ def write_csv(
     path.parent.mkdir(parents=True, exist_ok=True)
     if fieldnames is None:
         fieldnames = list(rows[0].keys())
-    normalized = [{k: row.get(k, "") for k in fieldnames} for row in rows]
     with path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(normalized)
+        writer.writerows({k: row.get(k, "") for k in fieldnames} for row in rows)
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:

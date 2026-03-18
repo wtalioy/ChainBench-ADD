@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ except ImportError:
 
 LOGGER = get_logger("stage4")
 RIR_WARNING_CACHE: set[str] = set()
+FFT_CONVOLUTION_THRESHOLD = 2_000_000
 
 
 def _log_rir_warning_once(key: str, message: str) -> None:
@@ -26,6 +28,24 @@ def _log_rir_warning_once(key: str, message: str) -> None:
         return
     LOGGER.warning(message)
     RIR_WARNING_CACHE.add(key)
+
+
+def _convolve_audio(audio: np.ndarray, rir: np.ndarray) -> np.ndarray:
+    output_len = len(audio) + len(rir) - 1
+    if len(audio) * len(rir) <= FFT_CONVOLUTION_THRESHOLD:
+        return np.convolve(audio, rir, mode="full").astype(np.float32)
+    fft_size = 1 << (output_len - 1).bit_length()
+    audio_fft = np.fft.rfft(audio, n=fft_size)
+    rir_fft = np.fft.rfft(rir, n=fft_size)
+    convolved = np.fft.irfft(audio_fft * rir_fft, n=fft_size)[:output_len]
+    return np.asarray(convolved, dtype=np.float32)
+
+
+@lru_cache(maxsize=128)
+def _inverse_sabine_cached(rt60: float, room_dim_key: tuple[float, ...]) -> tuple[float, int]:
+    if pra is None:
+        raise RuntimeError("pyroomacoustics is not installed")
+    return pra.inverse_sabine(rt60, list(room_dim_key))
 
 
 def _synthesize_rir(
@@ -76,7 +96,7 @@ def _apply_rir_synthetic(
     rir_cfg: dict[str, Any],
 ) -> tuple[np.ndarray, dict[str, Any]]:
     rir = _synthesize_rir(sample_rate, room["room_dim"], distance, rt60, seed, rir_cfg)
-    convolved = np.convolve(audio, rir, mode="full")
+    convolved = _convolve_audio(audio, rir)
     return peak_normalize(convolved), {"backend": "synthetic", "rir_num_samples": int(len(rir))}
 
 
@@ -127,7 +147,7 @@ def _apply_rir_pyroomacoustics(
         raise RuntimeError("pyroomacoustics is not installed")
     room_dim = [float(v) for v in room["room_dim"]]
     source_pos, mic_pos, actual_distance = _sample_rir_positions(room_dim, distance, seed, rir_cfg)
-    absorption, max_order = pra.inverse_sabine(rt60, room_dim)
+    absorption, max_order = _inverse_sabine_cached(float(rt60), tuple(room_dim))
     absorption = float(np.clip(absorption, 0.05, 0.99))
     max_order = int(max(1, min(max_order, int(rir_cfg.get("pyroomacoustics_max_order_cap", 24)))))
     shoebox = pra.ShoeBox(
@@ -145,7 +165,7 @@ def _apply_rir_pyroomacoustics(
         raise RuntimeError("pyroomacoustics returned an empty RIR")
     max_tail_sec = min(float(rir_cfg["max_tail_sec"]), max(0.3, rt60 * 1.2))
     rir = rir[: max(64, int(sample_rate * max_tail_sec))]
-    convolved = np.convolve(audio, rir, mode="full")
+    convolved = _convolve_audio(audio, rir)
     return peak_normalize(convolved), {
         "backend": "pyroomacoustics",
         "rir_num_samples": int(len(rir)),
@@ -204,6 +224,8 @@ class RIROperator(DeliveryOperator):
         room = params["room"]
         distance = float(params["distance"])
         rt60 = float(params["rt60"])
+        metadata["requested_backend"] = str(config["rir"].get("backend", "synthetic")).lower()
+        metadata["fallback_backend"] = str(config["rir"].get("fallback_backend", "synthetic")).lower()
         metadata["rt60"] = rt60
         metadata["distance"] = distance
         metadata["room_name"] = room["name"]

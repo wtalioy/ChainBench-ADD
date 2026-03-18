@@ -2,7 +2,7 @@
   "input_manifest": "data/stage4_delivery_chain/manifests/delivered_manifest.csv",
   "output_root": "data/ChainBench",
   "dataset_name": "ChainBench",
-  "workers": 8,
+  "workers": 32,
   "allow_partial_failures": true,
   "overwrite_audio": false,
   "ffprobe_sec": 30,

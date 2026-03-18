@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import tempfile
@@ -13,6 +14,13 @@ from lib.audio import ffprobe_audio
 from lib.config import relative_to_workspace
 
 from .operators import apply_operator, standardize_final_output
+
+
+def derive_render_seed(job: dict[str, Any], config: dict[str, Any]) -> int:
+    row = job["source_row"]
+    base_seed = int(row.get("seed") or config["seed"])
+    stable_offset = int(hashlib.sha1(job["sample_id"].encode("utf-8")).hexdigest()[:8], 16) % 100000
+    return base_seed + stable_offset
 
 
 def validate_final_output(probe: dict[str, Any], config: dict[str, Any]) -> str | None:
@@ -119,6 +127,7 @@ def render_single_job(
 
     if output_audio_path.exists() and not config.get("overwrite", False):
         probe = ffprobe_audio(output_audio_path)
+        derived_seed = derive_render_seed(job, config)
         if probe is not None and validate_final_output(probe, config) is None:
             trace_payload: dict[str, Any] | list[Any] = []
             if should_write_trace_json(config) and trace_path.exists():
@@ -133,10 +142,11 @@ def render_single_job(
                 "trace_path": trace_path if should_write_trace_json(config) else None,
                 "probe": probe,
                 "trace": trace_payload,
+                "seed": derived_seed,
             }
 
     trace_steps: list[dict[str, Any]] = []
-    seed = int(row.get("seed", config["seed"])) + hash(job["sample_id"]) % 100000
+    seed = derive_render_seed(job, config)
     try:
         source_probe: dict[str, Any] | None = None
         if not job["operators"] and should_copy_compatible_outputs(config):
@@ -153,6 +163,8 @@ def render_single_job(
                     "source_audio_path": relative_to_workspace(source_audio_path, workspace_root),
                     "output_audio_path": relative_to_workspace(output_audio_path, workspace_root),
                     "operators": job["operators"],
+                    "variant_index": int(job.get("variant_index", 0)),
+                    "seed": seed,
                     "steps": trace_steps,
                     "final_probe": source_probe,
                 }
@@ -164,6 +176,7 @@ def render_single_job(
                     "trace_path": trace_path if should_write_trace_json(config) else None,
                     "probe": source_probe,
                     "trace": trace,
+                    "seed": seed,
                 }
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -207,6 +220,8 @@ def render_single_job(
                 "source_audio_path": relative_to_workspace(source_audio_path, workspace_root),
                 "output_audio_path": relative_to_workspace(output_audio_path, workspace_root),
                 "operators": job["operators"],
+                "variant_index": int(job.get("variant_index", 0)),
+                "seed": seed,
                 "steps": trace_steps,
                 "final_probe": final_probe,
             }
@@ -218,6 +233,7 @@ def render_single_job(
                 "trace_path": trace_path if should_write_trace_json(config) else None,
                 "probe": final_probe,
                 "trace": trace,
+                "seed": seed,
             }
     except Exception as exc:
         return {
@@ -283,9 +299,10 @@ def build_manifest_row(
         "generator_name": row["generator_name"],
         "chain_family": job["family_name"],
         "chain_template_id": job["template_id"],
+        "chain_variant_index": str(int(job.get("variant_index", 0))),
         "operator_seq": json.dumps(operator_seq),
         "operator_params": json.dumps(job["operators"], ensure_ascii=False, sort_keys=True),
-        "seed": str(row.get("seed", "")),
+        "seed": str(render_result.get("seed", "")),
         "duration_sec": f"{probe['duration']:.3f}",
         "sample_rate": str(probe["sample_rate"]),
         "channels": str(probe["channels"]),
