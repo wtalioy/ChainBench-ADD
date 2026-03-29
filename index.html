@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainBench-ADD: A Delivery-Aware Benchmark for Audio Deepfake Detection</title>
+<meta name="description" content="ChainBench-ADD is a delivery-aware benchmark for audio deepfake detection containing 941,201 waveforms across five delivery families and five protocol-aware tasks.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Source+Sans+3:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false});"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+:root {
+  --navy: #1a1f36;
+  --navy-light: #252b48;
+  --amber: #e8a838;
+  --amber-light: #f5d490;
+  --teal: #2a9d8f;
+  --coral: #e76f51;
+  --sky: #4a90d9;
+  --purple: #7c5cbf;
+  --bg-white: #ffffff;
+  --bg-alt: #f6f7fb;
+  --bg-dark: #1a1f36;
+  --text: #2d2d3a;
+  --text-light: #6b7280;
+  --text-inv: #f0f0f5;
+  --border: #e2e4ea;
+  --radius: 8px;
+  --shadow: 0 2px 12px rgba(26,31,54,0.08);
+  --shadow-lg: 0 8px 32px rgba(26,31,54,0.12);
+  --font-heading: 'DM Serif Display', Georgia, serif;
+  --font-body: 'Source Sans 3', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --max-w: 1100px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 17px; }
+body { font-family: var(--font-body); color: var(--text); line-height: 1.7; background: var(--bg-white); }
+
+/* NAV */
+nav { position: sticky; top: 0; z-index: 100; background: var(--navy); border-bottom: 2px solid var(--amber); }
+nav .nav-inner { max-width: var(--max-w); margin: 0 auto; display: flex; align-items: center; gap: 0.25rem; padding: 0 1.5rem; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+nav a { color: var(--text-inv); text-decoration: none; font-size: 0.82rem; font-weight: 500; padding: 0.7rem 0.6rem; opacity: 0.8; transition: opacity 0.2s; flex-shrink: 0; }
+nav a:hover, nav a.active { opacity: 1; border-bottom: 2px solid var(--amber); }
+nav .nav-brand { font-family: var(--font-heading); font-size: 1rem; opacity: 1; color: var(--amber); padding-right: 1rem; border-right: 1px solid rgba(255,255,255,0.15); margin-right: 0.5rem; }
+
+/* SECTIONS */
+section { padding: 4rem 1.5rem; }
+section:nth-child(even) { background: var(--bg-alt); }
+.container { max-width: var(--max-w); margin: 0 auto; }
+.section-label { font-family: var(--font-mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--amber); margin-bottom: 0.5rem; font-weight: 500; }
+h2 { font-family: var(--font-heading); font-size: 2rem; color: var(--navy); margin-bottom: 1.5rem; line-height: 1.3; }
+h3 { font-family: var(--font-heading); font-size: 1.35rem; color: var(--navy); margin-bottom: 1rem; }
+p { margin-bottom: 1rem; }
+strong { font-weight: 600; }
+
+/* HERO */
+.hero { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%); color: var(--text-inv); text-align: center; padding: 5rem 1.5rem 4rem; }
+.hero h1 { font-family: var(--font-heading); font-size: 2.6rem; line-height: 1.25; margin-bottom: 1rem; max-width: 850px; margin-left: auto; margin-right: auto; }
+.hero .venue { font-size: 1rem; color: var(--amber-light); margin-bottom: 2rem; font-weight: 400; }
+.hero .actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+.hero .actions a, .hero .actions span { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1.4rem; border-radius: 50px; font-size: 0.9rem; font-weight: 600; text-decoration: none; transition: transform 0.15s, box-shadow 0.15s; }
+.hero .actions a { background: var(--amber); color: var(--navy); }
+.hero .actions a:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(232,168,56,0.4); }
+.hero .actions .disabled { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); cursor: default; }
+
+/* ABSTRACT */
+.abstract-text { font-size: 1.05rem; line-height: 1.85; max-width: 880px; margin: 0 auto; }
+.abstract-text .hl { font-weight: 700; color: var(--navy); }
+
+/* OVERVIEW FIGURE */
+.overview-fig { text-align: center; margin: 2rem 0; }
+.overview-fig img { max-width: 100%; border-radius: var(--radius); box-shadow: var(--shadow-lg); }
+.overview-fig figcaption { margin-top: 1rem; font-size: 0.9rem; color: var(--text-light); max-width: 880px; margin-left: auto; margin-right: auto; line-height: 1.6; }
+
+/* FAMILY CARDS */
+.family-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2.5rem; }
+.family-card { background: var(--bg-white); border-radius: var(--radius); padding: 1.25rem; box-shadow: var(--shadow); border-top: 4px solid var(--border); transition: transform 0.2s, box-shadow 0.2s; }
+.family-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+.family-card.direct { border-top-color: #6b7280; }
+.family-card.platform { border-top-color: var(--teal); }
+.family-card.telephony { border-top-color: var(--sky); }
+.family-card.simreplay { border-top-color: var(--coral); }
+.family-card.hybrid { border-top-color: var(--purple); }
+.family-card .fc-icon { font-size: 1.6rem; margin-bottom: 0.5rem; }
+.family-card h4 { font-family: var(--font-heading); font-size: 1.05rem; margin-bottom: 0.3rem; color: var(--navy); }
+.family-card .fc-count { font-size: 0.8rem; color: var(--text-light); margin-bottom: 0.5rem; }
+.family-card .fc-desc { font-size: 0.85rem; line-height: 1.5; color: var(--text); }
+
+/* TABLES */
+.table-wrap { overflow-x: auto; margin: 1.5rem 0; border-radius: var(--radius); box-shadow: var(--shadow); }
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; background: var(--bg-white); }
+thead th { background: var(--navy); color: var(--text-inv); font-weight: 600; text-align: left; padding: 0.7rem 0.8rem; position: sticky; top: 0; white-space: nowrap; }
+tbody td { padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border); }
+tbody tr:hover { background: rgba(74,144,217,0.04); }
+tbody tr:nth-child(even) { background: var(--bg-alt); }
+tbody tr:nth-child(even):hover { background: rgba(74,144,217,0.06); }
+.best { font-weight: 700; color: var(--navy); }
+
+/* OP PILLS */
+.op-pill { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.75rem; font-weight: 500; margin: 0.1rem; font-family: var(--font-mono); }
+.op-pill.codec { background: #dbeafe; color: #1e40af; }
+.op-pill.reencode { background: #e0e7ff; color: #3730a3; }
+.op-pill.resample { background: #fef3c7; color: #92400e; }
+.op-pill.bandlimit { background: #fce7f3; color: #9d174d; }
+.op-pill.packet_loss, .op-pill.packet-loss { background: #fee2e2; color: #991b1b; }
+.op-pill.noise { background: #d1fae5; color: #065f46; }
+.op-pill.rir { background: #ede9fe; color: #5b21b6; }
+.op-pill.call_path, .op-pill.call-path { background: #f0fdf4; color: #166534; }
+.op-arrow { color: var(--text-light); font-size: 0.75rem; margin: 0 0.15rem; }
+
+/* AUDIO SAMPLES */
+.sample-card { background: var(--bg-white); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 2rem; overflow: hidden; }
+.sample-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.badge { display: inline-block; padding: 0.2rem 0.65rem; border-radius: 50px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge-bf { background: #d1fae5; color: #065f46; }
+.badge-sp { background: #fee2e2; color: #991b1b; }
+.badge-en { background: #dbeafe; color: #1e40af; }
+.badge-zh { background: #fef3c7; color: #92400e; }
+.sample-transcript { font-style: italic; color: var(--text-light); font-size: 0.92rem; }
+.sample-body { padding: 0; }
+.sample-body table { margin: 0; box-shadow: none; }
+.sample-body thead th { background: var(--bg-alt); color: var(--navy); font-size: 0.8rem; }
+.sample-body tbody td { font-size: 0.85rem; vertical-align: middle; }
+.sample-body audio { height: 32px; width: 100%; min-width: 180px; }
+
+/* STAT COUNTERS */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1.5rem; margin-bottom: 3rem; }
+.stat-item { text-align: center; }
+.stat-num { font-family: var(--font-heading); font-size: 2.2rem; color: var(--navy); line-height: 1.2; }
+.stat-label { font-size: 0.82rem; color: var(--text-light); margin-top: 0.2rem; }
+
+/* CHARTS */
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; margin-top: 2rem; }
+.chart-box { background: var(--bg-white); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow); }
+.chart-box h4 { font-family: var(--font-heading); font-size: 1rem; margin-bottom: 1rem; color: var(--navy); text-align: center; }
+.chart-box canvas { max-height: 320px; }
+
+/* TASK CARDS */
+.task-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; }
+.task-card { background: var(--bg-white); border-radius: var(--radius); padding: 1.25rem 1.5rem; box-shadow: var(--shadow); border-left: 4px solid var(--amber); }
+.task-card h4 { font-family: var(--font-heading); font-size: 1rem; margin-bottom: 0.4rem; color: var(--navy); }
+.task-card .task-metric { font-family: var(--font-mono); font-size: 0.75rem; color: var(--teal); margin-bottom: 0.4rem; }
+.task-card p { font-size: 0.88rem; margin-bottom: 0; color: var(--text); line-height: 1.55; }
+
+/* CALLOUT */
+.callout { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-left: 4px solid var(--amber); border-radius: 0 var(--radius) var(--radius) 0; padding: 1rem 1.25rem; margin: 1.5rem 0; font-size: 0.92rem; }
+.callout strong { color: var(--navy); }
+
+/* ACCORDION */
+.accordion { margin-bottom: 0.5rem; }
+.accordion-btn { width: 100%; background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1.25rem; text-align: left; font-family: var(--font-heading); font-size: 1.05rem; color: var(--navy); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
+.accordion-btn:hover { background: var(--bg-alt); }
+.accordion-btn::after { content: '+'; font-size: 1.2rem; font-family: var(--font-mono); transition: transform 0.3s; }
+.accordion-btn.open::after { content: '\2212'; }
+.accordion-body { max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
+.accordion-body.open { max-height: 12000px; }
+.accordion-inner { padding: 1.25rem; border: 1px solid var(--border); border-top: 0; border-radius: 0 0 var(--radius) var(--radius); background: var(--bg-white); }
+
+/* PAPER-STYLE PROSE (appendix + license) */
+.paper-prose { font-family: 'Source Sans 3', Georgia, serif; line-height: 1.8; }
+.paper-prose h3 { font-family: var(--font-heading); font-size: 1.15rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+.paper-prose h4 { font-family: var(--font-heading); font-size: 1rem; margin-top: 1.25rem; margin-bottom: 0.5rem; }
+.paper-prose p { text-indent: 1.5em; margin-bottom: 0.7rem; font-size: 0.95rem; }
+.paper-prose p:first-of-type { text-indent: 0; }
+.paper-prose .katex-display { margin: 1rem 0; overflow-x: auto; }
+
+/* POLICY SECTION */
+.policy-grid { display: grid; gap: 2.5rem; }
+.policy-section { }
+.policy-section h3 { display: flex; align-items: center; gap: 0.5rem; }
+.policy-section h3 .policy-num { background: var(--navy); color: var(--text-inv); width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; font-family: var(--font-mono); flex-shrink: 0; }
+
+/* FOOTER */
+footer { background: var(--navy); color: var(--text-inv); padding: 2.5rem 1.5rem; text-align: center; }
+footer a { color: var(--amber); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+footer .footer-links { margin-bottom: 0.75rem; font-size: 0.9rem; }
+footer .footer-copy { font-size: 0.8rem; opacity: 0.6; }
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  html { font-size: 15px; }
+  .hero h1 { font-size: 1.8rem; }
+  h2 { font-size: 1.6rem; }
+  section { padding: 2.5rem 1rem; }
+  .stat-num { font-size: 1.6rem; }
+  .chart-grid { grid-template-columns: 1fr; }
+  .family-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+<div class="nav-inner">
+  <a href="#" class="nav-brand">ChainBench-ADD</a>
+  <a href="#abstract">Abstract</a>
+  <a href="#overview">Overview</a>
+  <a href="#families">Families &amp; Operators</a>
+  <a href="#samples">Audio Samples</a>
+  <a href="#statistics">Statistics</a>
+  <a href="#tasks">Tasks</a>
+  <a href="#experiments">Experiments</a>
+  <a href="#appendix">Appendix</a>
+  <a href="#policy">License &amp; Policy</a>
+</div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="top">
+<div class="container">
+  <h1>ChainBench-ADD: A Delivery-Aware Benchmark for Audio Deepfake Detection</h1>
+  <div class="venue">Under Review at ACM Multimedia 2026</div>
+  <div class="actions">
+    <a href="https://github.com/wtalioy/ChainBench" target="_blank">
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      Code
+    </a>
+    <a href="https://huggingface.co/datasets/Lioy/ChainBench" target="_blank">
+      &#129303; Dataset
+    </a>
+    <span class="disabled">Paper (coming soon)</span>
+  </div>
+</div>
+</section>
+
+<!-- ABSTRACT -->
+<section id="abstract">
+<div class="container">
+  <div class="section-label">Abstract</div>
+  <p class="abstract-text">
+    Current audio deepfake benchmarks mainly control the generation side of the problem, while realistic misuse unfolds along delivery chains such as platform re-encoding, telephony transmission, and replay-like capture that can alter forensic cues after synthesis. We introduce <strong>ChainBench-ADD</strong>, a delivery-aware benchmark that models post-generation delivery as a structured evaluation dimension through <span class="hl">delivery families</span>, <span class="hl">ordered templates</span>, <span class="hl">reusable operators</span>, and <span class="hl">realized chains</span>. Built on a matched-parent design linking each delivered sample to a clean bona fide or spoof parent, ChainBench-ADD enables controlled analysis under fixed transcript and speaker conditions. The benchmark contains <span class="hl">941,201 waveforms</span> derived from <span class="hl">55,813 parents</span> and supports <span class="hl">five protocol-aware tasks</span>: in-chain detection, operator substitution, parameter perturbation, order swap, and lineage-based robustness. Benchmarking representative detectors shows that realistic delivery remains a substantial source of difficulty, making ChainBench-ADD a useful testbed for delivery-aware audio deepfake detection.
+  </p>
+</div>
+</section>
+
+<!-- OVERVIEW -->
+<section id="overview">
+<div class="container">
+  <div class="section-label">Benchmark Overview</div>
+  <h2>How ChainBench-ADD Works</h2>
+  <figure class="overview-fig">
+    <img src="overview_figure.png" alt="Overview of ChainBench-ADD showing matched-parent design, five structured delivery families, and protocol-aware evaluation tasks">
+    <figcaption><strong>Figure 1.</strong> Overview of ChainBench-ADD. (A) Each delivered sample is linked to a matched bona fide or spoof parent. (B) Post-generation delivery is organized into five families through reusable operators and ordered templates. (C) The benchmark supports in-chain detection, matched local edits, and lineage robustness evaluation.</figcaption>
+  </figure>
+  <p>ChainBench-ADD represents post-generation delivery as a hierarchy rather than a flat list of perturbations. A <strong>delivery family</strong> defines the coarse scenario (e.g., platform redistribution vs. telephony call). A <strong>template</strong> defines an ordered route pattern within that scenario. A <strong>variant</strong> specifies its parameterization, and a <strong>delivery chain</strong> is the realized path applied to one parent sample. This separation supports analysis at every level&mdash;from broad scenario difficulty down to path-wise robustness under accumulated edits.</p>
+</div>
+</section>
+
+<!-- DELIVERY FAMILIES & OPERATORS -->
+<section id="families">
+<div class="container">
+  <div class="section-label">Delivery Families &amp; Operators</div>
+  <h2>Five Realistic Post-Generation Delivery Families</h2>
+
+  <div class="family-grid">
+    <div class="family-card direct">
+      <div class="fc-icon">&#9654;</div>
+      <h4>Direct</h4>
+      <div class="fc-count">1 template &middot; Identity control</div>
+      <div class="fc-desc">No delivery processing. Serves as the clean reference baseline for controlled comparison.</div>
+    </div>
+    <div class="family-card platform">
+      <div class="fc-icon">&#9729;</div>
+      <h4>Platform-like</h4>
+      <div class="fc-count">6 templates &middot; Operators: codec, re-encode, resample</div>
+      <div class="fc-desc">Approximates online redistribution and recompression pipelines typical of media-sharing platforms.</div>
+    </div>
+    <div class="family-card telephony">
+      <div class="fc-icon">&#9742;</div>
+      <h4>Telephony</h4>
+      <div class="fc-count">10 templates &middot; Operators: band-limit, codec, packet loss, call-path, resample</div>
+      <div class="fc-desc">Models bandwidth-limited call transmission with telephony codecs, packet impairment, jitter, and AGC.</div>
+    </div>
+    <div class="family-card simreplay">
+      <div class="fc-icon">&#127911;</div>
+      <h4>Simulated Replay</h4>
+      <div class="fc-count">7 templates &middot; Operators: RIR, noise, re-encode, resample</div>
+      <div class="fc-desc">Models playback and recapture in physical spaces through room impulse response and environmental noise.</div>
+    </div>
+    <div class="family-card hybrid">
+      <div class="fc-icon">&#128256;</div>
+      <h4>Hybrid</h4>
+      <div class="fc-count">9 templates &middot; Operators: codec, RIR, band-limit, re-encode, packet loss, resample</div>
+      <div class="fc-desc">Combines communication and acoustic effects within a single delivery path.</div>
+    </div>
+  </div>
+
+  <h3>Delivery Operator Inventory</h3>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Operator</th><th>Representative Settings</th><th>Families</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="op-pill resample">resample</span></td><td>16&rarr;8, 16&rarr;24, 16&rarr;8&rarr;16, 16&rarr;24&rarr;16, 16&rarr;32&rarr;16 kHz</td><td>P / T / H</td></tr>
+      <tr><td><span class="op-pill bandlimit">band-limit</span></td><td>Narrowband (250&ndash;3400 Hz), Wideband (50&ndash;7000 Hz)</td><td>T / H</td></tr>
+      <tr><td><span class="op-pill codec">codec</span></td><td>AAC (24/32/48 kbps), Opus (16/24/32 kbps), GSM, &mu;-law PCM</td><td>P / T / H</td></tr>
+      <tr><td><span class="op-pill reencode">re-encode</span></td><td>Same/cross-codec AAC/Opus recompression (24/32 kbps)</td><td>P / T / H</td></tr>
+      <tr><td><span class="op-pill packet-loss">packet loss</span></td><td>1/3/5/10% loss; burst 2/3/5; repeat-fade, interpolation, or noise-fill</td><td>T / H</td></tr>
+      <tr><td><span class="op-pill noise">noise</span></td><td>White, pink, brown, babble, hiss, hum; 30/20/15/10 dB SNR</td><td>R / H</td></tr>
+      <tr><td><span class="op-pill rir">RIR</span></td><td>Small/medium/large rooms; RT60 0.2/0.4/0.6/0.8 s; 0.5/1/2/3 m</td><td>R / H</td></tr>
+      <tr><td><span class="op-pill call-path">call-path</span></td><td>Joint channel filtering, codec, packet loss, jitter (0/8/16 ms), AGC</td><td>T / H</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p style="font-size:0.82rem;color:var(--text-light);margin-top:0.5rem;"><strong>Fam.</strong> P = Platform-like, T = Telephony, R = Simulated Replay, H = Hybrid. All operators are waveform-domain transforms, not symbolic tags.</p>
+
+  <div class="chart-grid" style="margin-top:2rem;">
+    <div class="chart-box">
+      <h4>Family &times; Operator Template Counts</h4>
+      <canvas id="heatmapChart"></canvas>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- AUDIO SAMPLES -->
+<section id="samples">
+<div class="container">
+  <div class="section-label">Audio Samples</div>
+  <h2>Listen: Delivery Transforms Across Families</h2>
+  <p>Each card below shows one parent utterance delivered through all five families. Compare how different delivery scenarios alter the same underlying speech.</p>
+
+  <!-- EN Bona Fide -->
+  <div class="sample-card">
+    <div class="sample-header">
+      <span class="badge badge-bf">Bona Fide</span>
+      <span class="badge badge-en">English</span>
+      <span class="sample-transcript">&ldquo;She has won numerous national and regional awards&rdquo;</span>
+    </div>
+    <div class="sample-body">
+    <table>
+      <thead><tr><th>Family</th><th>Template</th><th>Operator Chain</th><th style="min-width:200px">Audio</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Direct</strong></td><td>direct_clean</td><td><em>identity (no processing)</em></td><td><audio controls preload="none" src="audio/en_bf_direct.mp3"></audio></td></tr>
+        <tr><td><strong>Platform-like</strong></td><td>aac_reencode</td><td><span class="op-pill codec">codec</span><span class="op-arrow">&rarr;</span><span class="op-pill reencode">re-encode</span></td><td><audio controls preload="none" src="audio/en_bf_platform.mp3"></audio></td></tr>
+        <tr><td><strong>Telephony</strong></td><td>session_nb_mulaw</td><td><span class="op-pill call-path">call-path</span></td><td><audio controls preload="none" src="audio/en_bf_telephony.mp3"></audio></td></tr>
+        <tr><td><strong>Sim. Replay</strong></td><td>rir_noise_resample</td><td><span class="op-pill rir">RIR</span><span class="op-arrow">&rarr;</span><span class="op-pill noise">noise</span><span class="op-arrow">&rarr;</span><span class="op-pill resample">resample</span></td><td><audio controls preload="none" src="audio/en_bf_simreplay.mp3"></audio></td></tr>
+        <tr><td><strong>Hybrid</strong></td><td>reencode_rir_plr</td><td><span class="op-pill reencode">re-encode</span><span class="op-arrow">&rarr;</span><span class="op-pill rir">RIR</span><span class="op-arrow">&rarr;</span><span class="op-pill packet-loss">packet loss</span></td><td><audio controls preload="none" src="audio/en_bf_hybrid.mp3"></audio></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- EN Spoof -->
+  <div class="sample-card">
+    <div class="sample-header">
+      <span class="badge badge-sp">Spoof (Spark-TTS)</span>
+      <span class="badge badge-en">English</span>
+      <span class="sample-transcript">&ldquo;She has won numerous national and regional awards&rdquo;</span>
+    </div>
+    <div class="sample-body">
+    <table>
+      <thead><tr><th>Family</th><th>Template</th><th>Operator Chain</th><th style="min-width:200px">Audio</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Direct</strong></td><td>direct_clean</td><td><em>identity (no processing)</em></td><td><audio controls preload="none" src="audio/en_sp_direct.mp3"></audio></td></tr>
+        <tr><td><strong>Platform-like</strong></td><td>aac_single</td><td><span class="op-pill codec">codec</span></td><td><audio controls preload="none" src="audio/en_sp_platform.mp3"></audio></td></tr>
+        <tr><td><strong>Telephony</strong></td><td>wb_opus</td><td><span class="op-pill bandlimit">band-limit</span><span class="op-arrow">&rarr;</span><span class="op-pill codec">codec</span></td><td><audio controls preload="none" src="audio/en_sp_telephony.mp3"></audio></td></tr>
+        <tr><td><strong>Sim. Replay</strong></td><td>noise_rir</td><td><span class="op-pill noise">noise</span><span class="op-arrow">&rarr;</span><span class="op-pill rir">RIR</span></td><td><audio controls preload="none" src="audio/en_sp_simreplay.mp3"></audio></td></tr>
+        <tr><td><strong>Hybrid</strong></td><td>rir_aac</td><td><span class="op-pill rir">RIR</span><span class="op-arrow">&rarr;</span><span class="op-pill codec">codec</span></td><td><audio controls preload="none" src="audio/en_sp_hybrid.mp3"></audio></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- ZH Bona Fide -->
+  <div class="sample-card">
+    <div class="sample-header">
+      <span class="badge badge-bf">Bona Fide</span>
+      <span class="badge badge-zh">Chinese</span>
+      <span class="sample-transcript">&ldquo;&#20303;&#25151;&#32500;&#20462;&#36164;&#37329;&#32422;&#19968;&#20159;&#20803;&#19977;&#26159;&#24050;&#26377;&#20154;&#21592;&#21644;&#26426;&#26500;&rdquo;</span>
+    </div>
+    <div class="sample-body">
+    <table>
+      <thead><tr><th>Family</th><th>Template</th><th>Operator Chain</th><th style="min-width:200px">Audio</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Direct</strong></td><td>direct_clean</td><td><em>identity (no processing)</em></td><td><audio controls preload="none" src="audio/zh_bf_direct.mp3"></audio></td></tr>
+        <tr><td><strong>Platform-like</strong></td><td>aac_single</td><td><span class="op-pill codec">codec</span></td><td><audio controls preload="none" src="audio/zh_bf_platform.mp3"></audio></td></tr>
+        <tr><td><strong>Telephony</strong></td><td>nb_mulaw</td><td><span class="op-pill bandlimit">band-limit</span><span class="op-arrow">&rarr;</span><span class="op-pill codec">codec</span></td><td><audio controls preload="none" src="audio/zh_bf_telephony.mp3"></audio></td></tr>
+        <tr><td><strong>Sim. Replay</strong></td><td>rir_reencode</td><td><span class="op-pill rir">RIR</span><span class="op-arrow">&rarr;</span><span class="op-pill reencode">re-encode</span></td><td><audio controls preload="none" src="audio/zh_bf_simreplay.mp3"></audio></td></tr>
+        <tr><td><strong>Hybrid</strong></td><td>aac_rir</td><td><span class="op-pill codec">codec</span><span class="op-arrow">&rarr;</span><span class="op-pill rir">RIR</span></td><td><audio controls preload="none" src="audio/zh_bf_hybrid.mp3"></audio></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- ZH Spoof -->
+  <div class="sample-card">
+    <div class="sample-header">
+      <span class="badge badge-sp">Spoof (Spark-TTS)</span>
+      <span class="badge badge-zh">Chinese</span>
+      <span class="sample-transcript">&ldquo;&#20303;&#25151;&#32500;&#20462;&#36164;&#37329;&#32422;&#19968;&#20159;&#20803;&#19977;&#26159;&#24050;&#26377;&#20154;&#21592;&#21644;&#26426;&#26500;&rdquo;</span>
+    </div>
+    <div class="sample-body">
+    <table>
+      <thead><tr><th>Family</th><th>Template</th><th>Operator Chain</th><th style="min-width:200px">Audio</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Direct</strong></td><td>direct_clean</td><td><em>identity (no processing)</em></td><td><audio controls preload="none" src="audio/zh_sp_direct.mp3"></audio></td></tr>
+        <tr><td><strong>Platform-like</strong></td><td>aac_reencode</td><td><span class="op-pill codec">codec</span><span class="op-arrow">&rarr;</span><span class="op-pill reencode">re-encode</span></td><td><audio controls preload="none" src="audio/zh_sp_platform.mp3"></audio></td></tr>
+        <tr><td><strong>Telephony</strong></td><td>nb_mulaw_plr</td><td><span class="op-pill bandlimit">band-limit</span><span class="op-arrow">&rarr;</span><span class="op-pill codec">codec</span><span class="op-arrow">&rarr;</span><span class="op-pill packet-loss">packet loss</span></td><td><audio controls preload="none" src="audio/zh_sp_telephony.mp3"></audio></td></tr>
+        <tr><td><strong>Sim. Replay</strong></td><td>rir_noise</td><td><span class="op-pill rir">RIR</span><span class="op-arrow">&rarr;</span><span class="op-pill noise">noise</span></td><td><audio controls preload="none" src="audio/zh_sp_simreplay.mp3"></audio></td></tr>
+        <tr><td><strong>Hybrid</strong></td><td>bandlimit_codec_rir</td><td><span class="op-pill bandlimit">band-limit</span><span class="op-arrow">&rarr;</span><span class="op-pill codec">codec</span><span class="op-arrow">&rarr;</span><span class="op-pill rir">RIR</span></td><td><audio controls preload="none" src="audio/zh_sp_hybrid.mp3"></audio></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+</div>
+</section>
+
+<!-- STATISTICS -->
+<section id="statistics">
+<div class="container">
+  <div class="section-label">Dataset Statistics</div>
+  <h2>ChainBench-ADD at a Glance</h2>
+
+  <div class="stat-grid">
+    <div class="stat-item"><div class="stat-num" data-target="941201">0</div><div class="stat-label">Total Waveforms</div></div>
+    <div class="stat-item"><div class="stat-num" data-target="55813">0</div><div class="stat-label">Parent Utterances</div></div>
+    <div class="stat-item"><div class="stat-num" data-target="448">0</div><div class="stat-label">Speakers</div></div>
+    <div class="stat-item"><div class="stat-num" data-target="2">0</div><div class="stat-label">Languages</div></div>
+    <div class="stat-item"><div class="stat-num" data-target="5">0</div><div class="stat-label">Delivery Families</div></div>
+    <div class="stat-item"><div class="stat-num" data-target="33">0</div><div class="stat-label">Templates</div></div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-box">
+      <h4>Samples by Delivery Family</h4>
+      <canvas id="familyChart"></canvas>
+    </div>
+    <div class="chart-box">
+      <h4>Label Distribution</h4>
+      <canvas id="labelChart"></canvas>
+    </div>
+    <div class="chart-box">
+      <h4>Train / Dev / Test Split</h4>
+      <canvas id="splitChart"></canvas>
+    </div>
+    <div class="chart-box">
+      <h4>Language Distribution</h4>
+      <canvas id="langChart"></canvas>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- BENCHMARK TASKS -->
+<section id="tasks">
+<div class="container">
+  <div class="section-label">Benchmark Tasks</div>
+  <h2>Five Protocol-Aware Evaluation Tasks</h2>
+  <p>All tasks are reconstructed from a shared manifest rather than manually curated subsets, together with a leave-one-template-out protocol for cross-template generalization.</p>
+
+  <div class="task-grid">
+    <div class="task-card">
+      <h4>1. In-Chain Detection</h4>
+      <div class="task-metric">Metric: EER (%) per family</div>
+      <p>Bona fide vs. spoof classification within each delivery family. Measures scenario-level difficulty.</p>
+    </div>
+    <div class="task-card">
+      <h4>2. Operator Substitution</h4>
+      <div class="task-metric">Metrics: Pair Consistency, Both-Correct, NSD</div>
+      <p>Matched pairs differing by one operator. Tests whether changing operator identity breaks the detector.</p>
+    </div>
+    <div class="task-card">
+      <h4>3. Parameter Perturbation</h4>
+      <div class="task-metric">Metrics: Pair Consistency, Both-Correct, NSD</div>
+      <p>Matched pairs differing by one parameter within a fixed operator. Probes within-operator tolerance.</p>
+    </div>
+    <div class="task-card">
+      <h4>4. Order Swap</h4>
+      <div class="task-metric">Metrics: Pair Consistency, Both-Correct, NSD</div>
+      <p>Matched pairs differing by one adjacent operator swap. Reveals whether local reordering induces consistent-but-wrong predictions.</p>
+    </div>
+    <div class="task-card">
+      <h4>5. Delivery Robustness</h4>
+      <div class="task-metric">Metrics: C-FFD, R<sub>k</sub>, AURC-chain</div>
+      <p>Lineage-based evaluation along realistic delivery paths. Tests whether correct decisions persist as edits accumulate.</p>
+    </div>
+    <div class="task-card" style="border-left-color:var(--teal);">
+      <h4>+ Leave-One-Template-Out</h4>
+      <div class="task-metric">Metric: EER (%) per family</div>
+      <p>Cross-template generalization. One template excluded at training and evaluated at test time, averaged over held-out templates.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- EXPERIMENTS -->
+<section id="experiments">
+<div class="container">
+  <div class="section-label">Experiments</div>
+  <h2>Baseline Results</h2>
+  <p>Five representative detectors are benchmarked: AASIST, AASIST-L, XLS-R+SLS, SafeEar, and Nes2Net, covering graph-based, lightweight, self-supervised, communication-aware, and efficient detector families.</p>
+
+  <h3>In-Chain Detection EER (%) by Delivery Family</h3>
+  <div class="callout"><strong>Key finding:</strong> Detection difficulty varies systematically with the delivery family. Simulated replay and hybrid are consistently the hardest conditions across all baselines.</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Model</th><th>Direct</th><th>Platform</th><th>Telephony</th><th>SimReplay</th><th>Hybrid</th><th>Macro</th></tr></thead>
+    <tbody>
+      <tr><td>AASIST</td><td>13.00</td><td>24.06</td><td>27.29</td><td>39.23</td><td>42.26</td><td>29.17</td></tr>
+      <tr><td>AASIST-L</td><td>16.89</td><td>24.49</td><td>29.30</td><td>41.57</td><td>38.79</td><td>30.21</td></tr>
+      <tr><td>XLS-R+SLS</td><td class="best">12.92</td><td>11.04</td><td>16.01</td><td>20.90</td><td class="best">21.11</td><td>16.40</td></tr>
+      <tr><td>SafeEar</td><td>18.14</td><td>27.43</td><td>35.65</td><td>37.93</td><td>35.94</td><td>31.02</td></tr>
+      <tr><td>Nes2Net</td><td>13.03</td><td class="best">8.57</td><td class="best">15.82</td><td class="best">19.21</td><td>21.44</td><td class="best">15.61</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Leave-One-Template-Out EER (%)</h3>
+  <div class="callout"><strong>Key finding:</strong> The delivery-family difficulty ordering persists under unseen templates, confirming that family-level cues transfer beyond specific template memorization.</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Model</th><th>Platform</th><th>Telephony</th><th>SimReplay</th><th>Hybrid</th><th>Macro</th></tr></thead>
+    <tbody>
+      <tr><td>AASIST</td><td>23.52</td><td>28.52</td><td>41.66</td><td>41.55</td><td>33.81</td></tr>
+      <tr><td>AASIST-L</td><td>26.53</td><td>29.04</td><td>40.68</td><td>42.27</td><td>34.63</td></tr>
+      <tr><td>XLS-R+SLS</td><td>13.79</td><td>16.14</td><td>21.41</td><td>24.03</td><td>18.84</td></tr>
+      <tr><td>SafeEar</td><td>28.96</td><td>33.92</td><td>39.49</td><td>38.21</td><td>35.15</td></tr>
+      <tr><td>Nes2Net</td><td class="best">11.33</td><td class="best">16.08</td><td class="best">21.32</td><td class="best">24.09</td><td class="best">18.20</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Matched-Pair Robustness</h3>
+  <div class="callout"><strong>Key finding:</strong> Operator substitution is the most disruptive intervention. Order swap exposes a subtle weakness: high consistency can mask consistently wrong predictions, especially for weaker models.</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th rowspan="2">Model</th>
+        <th colspan="3" style="text-align:center;border-bottom:1px solid rgba(255,255,255,0.2)">Operator Substitution</th>
+        <th colspan="3" style="text-align:center;border-bottom:1px solid rgba(255,255,255,0.2)">Parameter Perturbation</th>
+        <th colspan="3" style="text-align:center">Order Swap</th>
+      </tr>
+      <tr>
+        <th>Cons.&uarr;</th><th>Both&uarr;</th><th>NSD&darr;</th>
+        <th>Cons.&uarr;</th><th>Both&uarr;</th><th>NSD&darr;</th>
+        <th>Cons.&uarr;</th><th>Both&uarr;</th><th>NSD&darr;</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>AASIST</td><td>74.80</td><td>54.79</td><td>52.67</td><td>78.16</td><td>62.41</td><td>43.49</td><td>80.98</td><td>58.74</td><td>41.20</td></tr>
+      <tr><td>AASIST-L</td><td>73.75</td><td>52.97</td><td>53.10</td><td>77.22</td><td>60.88</td><td>34.66</td><td>79.19</td><td>55.56</td><td>35.16</td></tr>
+      <tr><td>XLS-R+SLS</td><td class="best">87.74</td><td>81.07</td><td>20.47</td><td>90.36</td><td>85.99</td><td>16.48</td><td class="best">90.48</td><td class="best">82.62</td><td>16.47</td></tr>
+      <tr><td>SafeEar</td><td>65.25</td><td>47.60</td><td>52.90</td><td>67.40</td><td>51.29</td><td>45.69</td><td>72.56</td><td>51.23</td><td>39.85</td></tr>
+      <tr><td>Nes2Net</td><td>87.57</td><td class="best">81.86</td><td class="best">15.47</td><td class="best">90.45</td><td class="best">86.92</td><td class="best">11.70</td><td>89.32</td><td>81.83</td><td class="best">13.72</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Lineage-Level Delivery Robustness</h3>
+  <div class="callout"><strong>Key finding:</strong> Although XLS-R+SLS and Nes2Net are similarly strong under isolated interventions, Nes2Net is consistently better in C-FFD and AURC-chain, indicating more persistent correctness as delivery edits accumulate.</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Model</th><th>C-FFD</th><th>AURC-chain</th><th>R<sub>0</sub></th><th>R<sub>1</sub></th><th>R<sub>2</sub></th><th>R<sub>3</sub></th></tr></thead>
+    <tbody>
+      <tr><td>AASIST</td><td>2.79</td><td>69.73</td><td>73.82</td><td>68.60</td><td>68.25</td><td>68.24</td></tr>
+      <tr><td>AASIST-L</td><td>2.61</td><td>65.20</td><td>69.21</td><td>64.09</td><td>63.76</td><td>63.74</td></tr>
+      <tr><td>XLS-R+SLS</td><td>3.47</td><td>86.76</td><td>88.39</td><td>86.31</td><td>86.18</td><td>86.18</td></tr>
+      <tr><td>SafeEar</td><td>2.46</td><td>61.45</td><td>66.97</td><td>59.93</td><td>59.45</td><td>59.44</td></tr>
+      <tr><td>Nes2Net</td><td class="best">3.51</td><td class="best">87.86</td><td class="best">89.52</td><td class="best">87.40</td><td class="best">87.27</td><td class="best">87.26</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+</section>
+
+<!-- APPENDIX -->
+<section id="appendix">
+<div class="container">
+  <div class="section-label">Supplementary Material</div>
+  <h2>Appendix</h2>
+
+  <!-- A: Renderer Spec -->
+  <div class="accordion">
+    <button class="accordion-btn" onclick="toggleAccordion(this)">A. Renderer Specification: Families, Templates, and Operators</button>
+    <div class="accordion-body">
+      <div class="accordion-inner paper-prose">
+        <h4>Family-Level Rendering Logic</h4>
+        <p>For each parent utterance, the renderer first selects a chain family, then samples a concrete template from that family, and finally instantiates the template-level operators from fixed parameter pools. The direct family contributes a single identity control child, whereas each non-direct family contributes four rendered children. Within a family, template identifiers are deterministically shuffled per parent and sampled without replacement.</p>
+        <p>For paired templates, one canonical member of the pair is concretized first and its realized operators are then reordered to form the paired counterpart, so that the two children differ only in local order while sharing the same sampled parameters.</p>
+
+        <div class="table-wrap">
+        <table>
+          <thead><tr><th>Family</th><th>Templates</th><th>Children/parent</th><th>Rendering Policy</th></tr></thead>
+          <tbody>
+            <tr><td>Direct</td><td>1</td><td>1</td><td>Always emits the identity control child.</td></tr>
+            <tr><td>Platform-like</td><td>6</td><td>4</td><td>Templates sampled without replacement. No paired-template forcing.</td></tr>
+            <tr><td>Telephony</td><td>10</td><td>4</td><td>Templates sampled without replacement. No paired-template forcing.</td></tr>
+            <tr><td>Simulated Replay</td><td>7</td><td>4</td><td>One paired group (rir_reencode / reencode_rir) may be emitted before ordinary sampling.</td></tr>
+            <tr><td>Hybrid</td><td>9</td><td>4</td><td>Eligible paired groups: rir_aac/aac_rir and rir_reencode_plr/reencode_rir_plr.</td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <p>A further detail concerns re-encoding. In <em>same</em> mode, the re-encode operator uses the most recent codec already realized earlier in the chain. In <em>cross</em> mode, it differs from that codec and is sampled from {AAC, Opus}. If no earlier codec exists, the renderer falls back to a family-specific default: AAC for simulated replay and Opus for the relevant hybrid templates.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- B: Template Inventory -->
+  <div class="accordion">
+    <button class="accordion-btn" onclick="toggleAccordion(this)">B. Template Inventory (33 Templates)</button>
+    <div class="accordion-body">
+      <div class="accordion-inner paper-prose">
+        <p>The configuration contains 33 templates realizing 26 distinct ordered operator sequences. Several templates intentionally share the same operator multiset while changing only local order.</p>
+        <div class="table-wrap">
+        <table>
+          <thead><tr><th>Family</th><th>Template ID</th><th>Ordered Operator Sequence</th></tr></thead>
+          <tbody>
+            <tr><td>Direct</td><td>direct_clean</td><td>Identity chain (no operator)</td></tr>
+            <tr><td rowspan="6">Platform-like</td><td>aac_single</td><td><span class="op-pill codec">codec</span></td></tr>
+            <tr><td>opus_single</td><td><span class="op-pill codec">codec</span></td></tr>
+            <tr><td>aac_reencode</td><td><span class="op-pill codec">codec</span> <span class="op-arrow">&rarr;</span> <span class="op-pill reencode">re-encode</span></td></tr>
+            <tr><td>opus_reencode</td><td><span class="op-pill codec">codec</span> <span class="op-arrow">&rarr;</span> <span class="op-pill reencode">re-encode</span></td></tr>
+            <tr><td>aac_resample_reencode</td><td><span class="op-pill codec">codec</span> <span class="op-arrow">&rarr;</span> <span class="op-pill resample">resample</span> <span class="op-arrow">&rarr;</span> <span class="op-pill reencode">re-encode</span></td></tr>
+            <tr><td>resample_opus</td><td><span class="op-pill resample">resample</span> <span class="op-arrow">&rarr;</span> <span class="op-pill codec">codec</span></td></tr>
+            <tr><td rowspan="10">Telephony</td><td>nb_mulaw</td><td><span class="op-pill bandlimit">band-limit</span> <span class="op-arrow">&rarr;</span> <span class="op-pill codec">codec</span></td></tr>
+            <tr><td>nb_gsm</td><td><span class="op-pill bandlimit">band-limit</span> <span class="op-arrow">&rarr;</span> <span class="op-pill codec">codec</span></td></tr>
+            <tr><td>wb_opus</td><td><span class="op-pill bandlimit">band-limit</span> <span class="op-arrow">&rarr;</span> <span class="op-pill codec">codec</span></td></tr>
+            <tr><td>nb_mulaw_plr</td><td><span class="op-pill bandlimit">band-limit</span> <span class="op-arrow">&rarr;</span> <span class="op-pill codec">codec</span> <span class="op-arrow">&rarr;</span> <span class="op-pill packet-loss">packet loss</span></td></tr>
+            <tr><td>nb_resample_mulaw_plr</td><td><span class="op-pill resample">resample</span> <span class="op-arrow">&rarr;</span> <span class="op-pill bandlimit">band-limit</span> <span class="op-arrow">&rarr;</span> <span class="op-pill codec">codec</span> <span class="op-arrow">&rarr;</span> <span class="op-pill packet-loss">packet loss</span></td></tr>
+            <tr><td>wb_resample_opus_plr</td><td><span class="op-pill resample">resample</span> <span class="op-arrow">&rarr;</span> <span class="op-pill bandlimit">band-limit</span> <span class="op-arrow">&rarr;</span> <span class="op-pill codec">codec</span> <span class="op-arrow">&rarr;</span> <span class="op-pill packet-loss">packet loss</span></td></tr>
+            <tr><td>wb_opus_resample_return</td><td><span class="op-pill bandlimit">band-limit</span> <span class="op-arrow">&rarr;</span> <span class="op-pill codec">codec</span> <span class="op-arrow">&rarr;</span> <span class="op-pill resample">resample</span></td></tr>
+            <tr><td>session_nb_mulaw</td><td><span class="op-pill call-path">call-path</span></td></tr>
+            <tr><td>session_nb_gsm</td><td><span class="op-pill call-path">call-path</span></td></tr>
+            <tr><td>session_wb_opus</td><td><span class="op-pill call-path">call-path</span></td></tr>
+            <tr><td rowspan="7">Sim. Replay</td><td>rir_only</td><td><span class="op-pill rir">RIR</span></td></tr>
+            <tr><td>rir_noise</td><td><span class="op-pill rir">RIR</span> <span class="op-arrow">&rarr;</span> <span class="op-pill noise">noise</span></td></tr>
+            <tr><td>noise_rir</td><td><span class="op-pill noise">noise</span> <span class="op-arrow">&rarr;</span> <span class="op-pill rir">RIR</span></td></tr>
+            <tr><td>rir_reencode</td><td><span class="op-pill rir">RIR</span> <span class="op-arrow">&rarr;</span> <span class="op-pill reencode">re-encode</span></td></tr>
+            <tr><td>reencode_rir</td><td><span class="op-pill reencode">re-encode</span> <span class="op-arrow">&rarr;</span> <span class="op-pill rir">RIR</span></td></tr>
+            <tr><td>rir_noise_resample</td><td><span class="op-pill rir">RIR</span> <span class="op-arrow">&rarr;</span> <span class="op-pill noise">noise</span> <span class="op-arrow">&rarr;</span> <span class="op-pill resample">resample</span></td></tr>
+            <tr><td>resample_rir_reencode</td><td><span class="op-pill resample">resample</span> <span class="op-arrow">&rarr;</span> <span class="op-pill rir">RIR</span> <span class="op-arrow">&rarr;</span> <span class="op-pill reencode">re-encode</span></td></tr>
+            <tr><td rowspan="9">Hybrid</td><td>opus_plr_rir</td><td><span class="op-pill codec">codec</span> <span class="op-arrow">&rarr;</span> <span class="op-pill packet-loss">packet loss</span> <span class="op-arrow">&rarr;</span> <span class="op-pill rir">RIR</span></td></tr>
+            <tr><td>rir_aac</td><td><span class="op-pill rir">RIR</span> <span class="op-arrow">&rarr;</span> <span class="op-pill codec">codec</span></td></tr>
+            <tr><td>aac_rir</td><td><span class="op-pill codec">codec</span> <span class="op-arrow">&rarr;</span> <span class="op-pill rir">RIR</span></td></tr>
+            <tr><td>bandlimit_codec_rir</td><td><span class="op-pill bandlimit">band-limit</span> <span class="op-arrow">&rarr;</span> <span class="op-pill codec">codec</span> <span class="op-arrow">&rarr;</span> <span class="op-pill rir">RIR</span></td></tr>
+            <tr><td>rir_bandlimit_codec</td><td><span class="op-pill rir">RIR</span> <span class="op-arrow">&rarr;</span> <span class="op-pill bandlimit">band-limit</span> <span class="op-arrow">&rarr;</span> <span class="op-pill codec">codec</span></td></tr>
+            <tr><td>rir_reencode_plr</td><td><span class="op-pill rir">RIR</span> <span class="op-arrow">&rarr;</span> <span class="op-pill reencode">re-encode</span> <span class="op-arrow">&rarr;</span> <span class="op-pill packet-loss">packet loss</span></td></tr>
+            <tr><td>reencode_rir_plr</td><td><span class="op-pill reencode">re-encode</span> <span class="op-arrow">&rarr;</span> <span class="op-pill rir">RIR</span> <span class="op-arrow">&rarr;</span> <span class="op-pill packet-loss">packet loss</span></td></tr>
+            <tr><td>resample_codec_rir</td><td><span class="op-pill resample">resample</span> <span class="op-arrow">&rarr;</span> <span class="op-pill codec">codec</span> <span class="op-arrow">&rarr;</span> <span class="op-pill rir">RIR</span></td></tr>
+            <tr><td>bandlimit_resample_codec</td><td><span class="op-pill bandlimit">band-limit</span> <span class="op-arrow">&rarr;</span> <span class="op-pill resample">resample</span> <span class="op-arrow">&rarr;</span> <span class="op-pill codec">codec</span></td></tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C: Parameter Pools -->
+  <div class="accordion">
+    <button class="accordion-btn" onclick="toggleAccordion(this)">C. Fixed Parameter Pools and Output Constraints</button>
+    <div class="accordion-body">
+      <div class="accordion-inner paper-prose">
+        <div class="table-wrap">
+        <table>
+          <thead><tr><th>Group</th><th>Released Values</th><th>Used By</th></tr></thead>
+          <tbody>
+            <tr><td>Codec bitrates</td><td>AAC at 24, 32, 48 kbps; Opus at 16, 24, 32 kbps; telephony Opus at 16, 24 kbps; re-encode at 24, 32 kbps</td><td>codec, re-encode, call-path</td></tr>
+            <tr><td>Resample modes</td><td>Platform-like: 16k&rarr;8k&rarr;16k, 16k&rarr;24k&rarr;16k; Sim. replay: 16k&rarr;24k&rarr;16k, 16k&rarr;32k&rarr;16k; Hybrid: 16k&rarr;8k, 16k&rarr;24k, 16k&rarr;8k&rarr;16k</td><td>resample</td></tr>
+            <tr><td>Re-encode codecs</td><td>AAC and Opus, with same/cross selection</td><td>re-encode</td></tr>
+            <tr><td>Packet-loss settings</td><td>Loss rate 1/3/5/10%; burst length 2/3/5 frames; concealment: repeat-fade, interpolation, noise fill</td><td>packet loss, call-path</td></tr>
+            <tr><td>Call-path settings</td><td>Jitter 0/8/16 ms; AGC profile: mild, telephony</td><td>call-path</td></tr>
+            <tr><td>Noise settings</td><td>Type: white, pink, brown, babble, hiss, hum; SNR: 30/20/15/10 dB</td><td>noise</td></tr>
+            <tr><td>RIR settings</td><td>RT60: 0.2/0.4/0.6/0.8 s; distance: 0.5/1.0/2.0/3.0 m; rooms: small (3&times;4&times;2.8), medium (5&times;6&times;3), large (8&times;10&times;3.5) m</td><td>RIR</td></tr>
+            <tr><td>Output/validation</td><td>Mono 16 kHz PCM WAV (pcm_s16le, s16); duration validated in [1, 30] s</td><td>all outputs</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- D: Operator Realization -->
+  <div class="accordion">
+    <button class="accordion-btn" onclick="toggleAccordion(this)">D. Operator Realization Details</button>
+    <div class="accordion-body">
+      <div class="accordion-inner paper-prose">
+        <p style="text-indent:0">All operators are realized as waveform-domain transforms rather than symbolic metadata tags, and every realized operator is recorded in the manifest trace.</p>
+
+        <h4>Resampling</h4>
+        <p style="text-indent:0">Uses ffmpeg with the SoX resampler at precision 28. One-way modes include 16k&rarr;8k, 16k&rarr;24k, 16k&rarr;32k, and their inverses. Round-trip modes are two successive resampling steps with an intermediate waveform.</p>
+
+        <h4>Band-Limiting</h4>
+        <p style="text-indent:0">Implemented with ffmpeg filtering. Narrowband: second-order high-pass at 250 Hz and low-pass at 3400 Hz, followed by companding (0.01 s attack, 0.15 s decay). Wideband: second-order high-pass at 50 Hz and low-pass at 7000 Hz.</p>
+
+        <h4>Codec and Re-encoding</h4>
+        <p style="text-indent:0">Both perform true encode&ndash;decode round trips through ffmpeg. Supported codecs: AAC, Opus, GSM, &mu;-law PCM, A-law PCM. The only difference: <em>codec</em> follows the template specification directly, while <em>re-encode</em> follows the context-aware same/cross rule.</p>
+
+        <h4>Packet Loss</h4>
+        <p style="text-indent:0">Operates on 20 ms waveform frames using a two-state good/bad Markov process:</p>
+        <p style="text-indent:0">$$P(\text{bad}\to\text{good}) = \min(1,\; 1/b)$$</p>
+        <p style="text-indent:0">$$P(\text{good}\to\text{bad}) = \min\!\left(1,\; \frac{p \cdot P(\text{bad}\to\text{good})}{1-p}\right)$$</p>
+        <p>where $p$ is the target loss rate (clamped to at most 0.95) and $b$ is the average burst length in frames. Concealment strategies: repeat-fade, interpolation, or noise fill.</p>
+
+        <h4>Room Impulse Responses</h4>
+        <p style="text-indent:0">First attempts room simulation with Pyroomacoustics (inverse Sabine absorption, valid source/mic positions, tail truncation, convolution with peak normalization). Falls back to a synthetic RIR generator based on direct path, exponentially decaying random reflections, and a low-level noise floor.</p>
+
+        <h4>Additive Noise</h4>
+        <p style="text-indent:0">White: i.i.d. Gaussian; pink: $1/\sqrt{f}$ spectral shaping; brown: cumulative summation; hiss: high-frequency emphasis; hum: 50/100/150 Hz tonal + low-level white; babble: sum of six randomly shifted/scaled streams. For babble, hum, and hiss, a non-stationary amplitude envelope is applied before SNR calibration.</p>
+
+        <h4>Call Paths</h4>
+        <p style="text-indent:0">Composite transform with fixed internal pipeline: band filtering &rarr; resample to target rate &rarr; codec round trip &rarr; burst packet loss &rarr; jitter-buffer simulation &rarr; AGC/limiting. Jitter displaces each frame by a uniform offset in $[-J, J]$, overlap-averages, and trims back to original length.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- E: Drift Validation -->
+  <div class="accordion">
+    <button class="accordion-btn" onclick="toggleAccordion(this)">E. Matched-Parent Drift Validation</button>
+    <div class="accordion-body">
+      <div class="accordion-inner paper-prose">
+        <p style="text-indent:0">On the 141,811-sample test split derived from 8,407 parents, we compare each delivered child with its clean parent using off-the-shelf ASR and speaker-embedding backends. Overall: mean &Delta;WER = 0.061, mean &Delta;CER = 0.043, mean speaker cosine = 0.941, mean duration ratio = 1.056, mean |&Delta;RMS| = 2.334 dB.</p>
+        <div class="table-wrap">
+        <table>
+          <thead><tr><th>Family</th><th>&Delta;WER</th><th>&Delta;CER</th><th>Speaker cos.</th><th>Dur. ratio</th><th>|&Delta;RMS|</th></tr></thead>
+          <tbody>
+            <tr><td>Direct</td><td>0.000</td><td>0.000</td><td>1.000</td><td>1.000</td><td>0.000</td></tr>
+            <tr><td>Platform</td><td>0.012</td><td>0.011</td><td>0.986</td><td>1.005</td><td>0.245</td></tr>
+            <tr><td>Telephony</td><td>0.059</td><td>0.046</td><td>0.943</td><td>1.001</td><td>1.620</td></tr>
+            <tr><td>SimReplay</td><td>0.094</td><td>0.063</td><td>0.909</td><td>1.120</td><td>4.247</td></tr>
+            <tr><td>Hybrid</td><td>0.095</td><td>0.065</td><td>0.910</td><td>1.114</td><td>3.842</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p>These results support the benchmark design: delivery transforms are substantial enough to create a meaningful robustness challenge while preserving the matched-parent structure needed for controlled evaluation.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- F: Robustness Metrics -->
+  <div class="accordion">
+    <button class="accordion-btn" onclick="toggleAccordion(this)">F. Benchmark-Specific Robustness Metrics</button>
+    <div class="accordion-body">
+      <div class="accordion-inner paper-prose">
+        <h4>Notation and Thresholding</h4>
+        <p style="text-indent:0">Let each sample have score $s_i \in \mathbb{R}$ and binary label $y_i \in \{0,1\}$ ($y_i=1$ for bona fide). Scores are converted to hard decisions by $\hat{y}_i = \mathbb{I}[s_i \ge \tau_{\text{pair}}]$, where $\tau_{\text{pair}} = \tau_{\text{EER}}$ if both classes are present, and $0.5$ otherwise.</p>
+
+        <h4>Matched-Pair Metrics</h4>
+        <p style="text-indent:0">For matched pairs $\mathcal{P} = \{(i_m, j_m)\}_{m=1}^{M}$ sharing the same label and differing only in the targeted intervention:</p>
+        <p style="text-indent:0"><strong>Pair Consistency Rate (PCR):</strong></p>
+        <p style="text-indent:0">$$\text{PCR} = \frac{1}{M}\sum_{m=1}^{M}\mathbb{I}[\hat{y}_{i_m} = \hat{y}_{j_m}]$$</p>
+        <p style="text-indent:0"><strong>Pair Joint Accuracy (PJA):</strong></p>
+        <p style="text-indent:0">$$\text{PJA} = \frac{1}{M}\sum_{m=1}^{M}\mathbb{I}[\hat{y}_{i_m} = y_{i_m} \;\land\; \hat{y}_{j_m} = y_{j_m}]$$</p>
+        <p style="text-indent:0"><strong>Mean Normalized Score Drift (MNSD):</strong> Let $\text{IQR}(S) = Q_{0.75}(S) - Q_{0.25}(S)$. Then:</p>
+        <p style="text-indent:0">$$\text{MNSD} = \frac{1}{\max(\text{IQR}(S),\, 10^{-12})} \cdot \frac{1}{M}\sum_{m=1}^{M}|s_{i_m} - s_{j_m}|$$</p>
+        <p style="text-indent:0"><strong>Symmetric Misclassification Risk (SMR):</strong> $\text{SMR} = \frac{1}{M}\sum_{m=1}^{M}\frac{\ell_{i_m}+\ell_{j_m}}{2}$, where $\ell_i = \mathbb{I}[\hat{y}_i \neq y_i]$.</p>
+
+        <h4>Delivery-Lineage Metrics</h4>
+        <p style="text-indent:0">A lineage groups samples sharing the same parent, family, and label. Distances are defined on a lineage graph where edges connect realizations differing by one atomic delivery edit.</p>
+        <p style="text-indent:0"><strong>Censored First-Failure Distance (C-FFD):</strong></p>
+        <p style="text-indent:0">$$\tilde{\rho}_g = \begin{cases}\rho_g, & \text{if lineage } g \text{ has at least one failure},\\ D_{\max}+1, & \text{otherwise}\end{cases}$$</p>
+        <p style="text-indent:0">$$\text{C-FFD} = \frac{1}{|\mathcal{G}|}\sum_{g \in \mathcal{G}}\tilde{\rho}_g$$</p>
+        <p style="text-indent:0"><strong>Robust-at-Distance $R_k$:</strong></p>
+        <p style="text-indent:0">$$R_k = \frac{1}{|\mathcal{G}|}\sum_{g \in \mathcal{G}}\mathbb{I}\!\left[\forall v \in g,\; d_g(v) \le k \Rightarrow c(v)=1\right]$$</p>
+        <p style="text-indent:0"><strong>AURC-chain:</strong></p>
+        <p style="text-indent:0">$$\text{AURC-chain} = \frac{1}{D_{\max}+1}\sum_{k=0}^{D_{\max}} R_k$$</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+</section>
+
+<!-- LICENSE, RELEASE, RESPONSIBLE USE -->
+<section id="policy">
+<div class="container">
+  <div class="section-label">Policy &amp; Licensing</div>
+  <h2>License, Release, and Responsible Use</h2>
+  <p style="margin-bottom:2rem;">
+    <a href="https://github.com/wtalioy/ChainBench/blob/main/LICENSE" target="_blank" style="display:inline-block;padding:0.3rem 0.8rem;background:var(--bg-alt);border:1px solid var(--border);border-radius:50px;font-size:0.8rem;color:var(--text);text-decoration:none;font-weight:600;">MIT License</a>
+  </p>
+
+  <div class="policy-grid paper-prose">
+    <div class="policy-section">
+      <h3><span class="policy-num">1</span> License Compliance and Provenance</h3>
+      <p style="text-indent:0">ChainBench-ADD is built from multiple upstream speech resources and TTS systems with heterogeneous license and usage terms. For this reason, the release distinguishes between assets created by this project and assets obtained from third-party providers.</p>
+      <p>Assets created by this project include the benchmark organization, metadata manifests, split files, delivery templates, operator configurations, reconstruction scripts, and baseline detection code. These components are provided through the public release.</p>
+      <p>Upstream speech corpora, model checkpoints, and other third-party components remain subject to their original licenses, model-use agreements, and provider-specific restrictions. The benchmark release should therefore be understood as a release of the benchmark package and its derived annotations and code, not as a blanket relicensing of all upstream resources used during construction. Users are responsible for complying with the terms of the original providers when obtaining, using, or redistributing upstream dependencies.</p>
+      <p>For transparency, the project documents the provenance of major upstream components, including the speech libraries and TTS systems used during benchmark construction. The documentation also records the software and model versions used in generation and evaluation. If an upstream provider updates its terms or requests changes affecting redistribution, the benchmark maintainers may update the hosted materials, documentation, or access policy accordingly.</p>
+    </div>
+
+    <div class="policy-section">
+      <h3><span class="policy-num">2</span> Release Package</h3>
+      <p style="text-indent:0">ChainBench-ADD is publicly released as a benchmark for delivery-aware audio deepfake detection. The project website serves as the main entry point and provides links to the dataset release, source code repository, documentation, and benchmark resources.</p>
+      <p>The released package includes benchmark audio, metadata manifests, split definitions, construction and rendering scripts, configuration files, and baseline training and evaluation code. The metadata support all benchmark protocols, including parent&ndash;child linkage, delivery-family labels, template and variant identifiers, ordered operator signatures, and task-specific grouping information. The repository also provides example commands, default hyper-parameters, and instructions for reproducing the benchmark tasks and baseline experiments.</p>
+      <p>We distinguish between <strong>benchmark assets released by this project</strong> and <strong>third-party upstream assets used during construction</strong>. The public release is intended to provide a usable benchmark for evaluation together with a reproducible pipeline. Where an upstream dependency is governed by separate license or access terms, those terms remain in force and are not replaced by the benchmark release itself.</p>
+    </div>
+
+    <div class="policy-section">
+      <h3><span class="policy-num">3</span> Responsible Use</h3>
+      <p style="text-indent:0">ChainBench-ADD is released for research on audio deepfake detection, robustness evaluation, and benchmark construction. It is not released as a voice-cloning service, an impersonation toolkit, or a turnkey package for deceptive speech generation. The intended use of the benchmark is defensive: to study how post-generation delivery affects detector reliability and to support the development of more robust countermeasures.</p>
+      <p>The project must not be used for impersonation, fraud, harassment, social engineering, or the creation of deceptive media intended to mislead listeners. The release also preserves and defers to upstream restrictions where they exist, rather than claiming a single unrestricted use policy for all components.</p>
+      <p>We recognize that speech data may create privacy and identity risks even when obtained from public or permissively distributed resources. For this reason, the project documentation includes provenance information, responsible-use guidance, and contact information for reporting concerns related to licensing, access, or misuse. Future updates to the public release will continue to follow applicable upstream terms and institutional requirements.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/wtalioy/ChainBench">GitHub</a> &nbsp;&middot;&nbsp;
+    <a href="https://huggingface.co/datasets/Lioy/ChainBench">HuggingFace Dataset</a>
+  </div>
+  <div class="footer-copy">ChainBench-ADD &middot; Released under the MIT License</div>
+</footer>
+
+<script>
+/* Accordion */
+function toggleAccordion(btn) {
+  const body = btn.nextElementSibling;
+  btn.classList.toggle('open');
+  body.classList.toggle('open');
+}
+
+/* Animated counters */
+function animateCounters() {
+  document.querySelectorAll('.stat-num[data-target]').forEach(el => {
+    const target = parseInt(el.dataset.target);
+    if (el.dataset.animated) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        el.dataset.animated = '1';
+        const duration = 1600;
+        const start = performance.now();
+        function step(now) {
+          const progress = Math.min((now - start) / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          el.textContent = Math.round(eased * target).toLocaleString();
+          if (progress < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+        observer.disconnect();
+      }
+    }, {threshold: 0.3});
+    observer.observe(el);
+  });
+}
+
+/* Charts */
+function initCharts() {
+  const fontFamily = "'Source Sans 3', sans-serif";
+  Chart.defaults.font.family = fontFamily;
+  Chart.defaults.font.size = 13;
+  Chart.defaults.color = '#6b7280';
+
+  /* Family bar chart */
+  new Chart(document.getElementById('familyChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Direct', 'Platform-like', 'Telephony', 'Sim. Replay', 'Hybrid'],
+      datasets: [
+        { label: 'Bona Fide', data: [18703, 74707, 74426, 73909, 73828], backgroundColor: '#2a9d8f' },
+        { label: 'Spoof', data: [37110, 148203, 147291, 146638, 146386], backgroundColor: '#e76f51' }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { callback: v => (v/1000)+'k' } },
+        y: { stacked: true, grid: { display: false } }
+      }
+    }
+  });
+
+  /* Label donut */
+  new Chart(document.getElementById('labelChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Bona Fide (315,573)', 'Spoof (625,628)'],
+      datasets: [{ data: [315573, 625628], backgroundColor: ['#2a9d8f', '#e76f51'], borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  });
+
+  /* Split bar */
+  new Chart(document.getElementById('splitChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Train', 'Dev', 'Test'],
+      datasets: [
+        { label: 'Samples', data: [663363, 136027, 141811], backgroundColor: '#4a90d9', yAxisID: 'y' },
+        { label: 'Speakers', data: [314, 67, 67], backgroundColor: '#e8a838', yAxisID: 'y1', barPercentage: 0.4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        y: { position: 'left', grid: { display: false }, ticks: { callback: v => (v/1000)+'k' } },
+        y1: { position: 'right', grid: { display: false }, ticks: { callback: v => v } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  /* Language bar */
+  new Chart(document.getElementById('langChart'), {
+    type: 'bar',
+    data: {
+      labels: ['English', 'Chinese'],
+      datasets: [{ label: 'Samples', data: [814026, 127175], backgroundColor: ['#4a90d9', '#e8a838'] }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { grid: { display: false }, ticks: { callback: v => (v/1000)+'k' } }, x: { grid: { display: false } } }
+    }
+  });
+
+  /* Family x Operator heatmap (as grouped bar) */
+  const ops = ['resample','band-limit','codec','re-encode','packet loss','noise','RIR','call-path'];
+  const families = {
+    'Platform-like': [2,0,4,4,0,0,0,0],
+    'Telephony':     [2,3,6,0,3,0,0,3],
+    'Sim. Replay':   [2,0,0,3,0,2,5,0],
+    'Hybrid':        [3,3,5,2,2,0,6,0]
+  };
+  new Chart(document.getElementById('heatmapChart'), {
+    type: 'bar',
+    data: {
+      labels: ops,
+      datasets: Object.entries(families).map(([name, data], i) => ({
+        label: name,
+        data: data,
+        backgroundColor: ['#2a9d8f','#4a90d9','#e76f51','#7c5cbf'][i]
+      }))
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { grid: { display: false }, title: { display: true, text: 'Templates containing operator' } }, x: { grid: { display: false } } }
+    }
+  });
+}
+
+/* Nav active state */
+function initNav() {
+  const links = document.querySelectorAll('nav a:not(.nav-brand)');
+  const sections = [...links].map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  window.addEventListener('scroll', () => {
+    const y = window.scrollY + 80;
+    let current = '';
+    sections.forEach(s => { if (s.offsetTop <= y) current = '#' + s.id; });
+    links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === current));
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  animateCounters();
+  initCharts();
+  initNav();
+});
+</script>
+</body>
+</html>
