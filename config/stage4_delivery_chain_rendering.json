@@ -317,7 +317,7 @@
           "template_id": "session_nb_mulaw",
           "operators": [
             {
-              "op": "telephony_session",
+              "op": "call_path",
               "profile": "NB",
               "codec": "pcm_mulaw",
               "encode_sample_rate": 8000,
@@ -343,7 +343,7 @@
           "template_id": "session_nb_gsm",
           "operators": [
             {
-              "op": "telephony_session",
+              "op": "call_path",
               "profile": "NB",
               "codec": "gsm",
               "encode_sample_rate": 8000,
@@ -369,7 +369,7 @@
           "template_id": "session_wb_opus",
           "operators": [
             {
-              "op": "telephony_session",
+              "op": "call_path",
               "profile": "WB",
               "codec": "opus",
               "bitrate": {

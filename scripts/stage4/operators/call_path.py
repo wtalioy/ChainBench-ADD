@@ -1,4 +1,4 @@
-"""Composite telephony-session operator with codec, burst loss, jitter, and AGC."""
+"""Composite call-path operator with codec, burst loss, jitter, and AGC."""
 
 from __future__ import annotations
 
@@ -70,10 +70,10 @@ def _apply_jitter_buffer_model(
     return trimmed[: len(audio)].astype(np.float32)
 
 
-class TelephonySessionOperator(DeliveryOperator):
+class CallPathOperator(DeliveryOperator):
     @property
     def op_name(self) -> str:
-        return "telephony_session"
+        return "call_path"
 
     def _apply_impl(
         self,

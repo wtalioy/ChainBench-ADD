@@ -148,7 +148,7 @@ def _rir_signature_tokens(operator: dict[str, Any]) -> list[str]:
     return tokens
 
 
-def _telephony_session_signature_tokens(operator: dict[str, Any]) -> list[str]:
+def _call_path_signature_tokens(operator: dict[str, Any]) -> list[str]:
     tokens: list[str] = []
     _append_text_token(tokens, "profile", operator.get("profile"))
     _append_text_token(tokens, "codec", operator.get("codec"))
@@ -179,8 +179,8 @@ def _operator_signature_tokens(operator: dict[str, Any]) -> list[str]:
         return _rir_signature_tokens(operator)
     if op_name == "resample":
         return [f"resample={value}" for value in [_normalize_text(operator.get("mode"))] if value]
-    if op_name == "telephony_session":
-        return _telephony_session_signature_tokens(operator)
+    if op_name == "call_path":
+        return _call_path_signature_tokens(operator)
     return []
 
 
