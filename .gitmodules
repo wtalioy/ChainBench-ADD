@@ -10,3 +10,21 @@
 [submodule "baselines/SafeEar"]
 	path = baselines/SafeEar
 	url = https://github.com/wtalioy/SafeEar.git
+[submodule "generators/CosyVoice"]
+	path = generators/CosyVoice
+	url = https://github.com/FunAudioLLM/CosyVoice.git
+[submodule "generators/F5-TTS"]
+	path = generators/F5-TTS
+	url = https://github.com/SWivid/F5-TTS.git
+[submodule "generators/Qwen3-TTS"]
+	path = generators/Qwen3-TTS
+	url = https://github.com/QwenLM/Qwen3-TTS.git
+[submodule "generators/Spark-TTS"]
+	path = generators/Spark-TTS
+	url = https://github.com/SparkAudio/Spark-TTS.git
+[submodule "generators/VoxCPM"]
+	path = generators/VoxCPM
+	url = https://github.com/OpenBMB/VoxCPM.git
+[submodule "generators/index-tts"]
+	path = generators/index-tts
+	url = https://github.com/index-tts/index-tts.git
