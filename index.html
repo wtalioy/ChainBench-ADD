@@ -45,11 +45,11 @@ body { font-family: var(--font); color: var(--text); line-height: 1.8; backgroun
 
 /* --- Navigation --- */
 nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.72); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid var(--border-light); }
-nav .nav-inner { max-width: var(--max-w); margin: 0 auto; display: flex; align-items: center; gap: 0.25rem; padding: 0 2rem; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
-nav a { color: var(--text); text-decoration: none; font-size: 0.875rem; font-weight: 500; padding: 0.9rem 0.7rem; opacity: 0.55; transition: opacity var(--transition); flex-shrink: 0; }
+nav .nav-inner { max-width: var(--max-w); margin: 0 auto; display: flex; align-items: center; gap: 0.5rem; padding: 0 2rem; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+nav a { color: var(--text); text-decoration: none; font-size: 0.95rem; font-weight: 500; padding: 1rem 0.65rem; opacity: 0.5; transition: opacity var(--transition); flex-shrink: 0; }
 nav a:hover { opacity: 1; }
 nav a.active { opacity: 1; color: var(--accent); }
-nav .nav-brand { font-weight: 700; font-size: 1rem; opacity: 1; color: var(--text); padding-right: 1.25rem; border-right: 1px solid var(--border-light); margin-right: 0.75rem; letter-spacing: -0.02em; }
+nav .nav-brand { font-weight: 700; font-size: 1.2rem; opacity: 1; color: var(--text); padding-right: 1.5rem; border-right: 1px solid var(--border-light); margin-right: 0.75rem; letter-spacing: -0.03em; }
 
 /* --- Sections --- */
 section { padding: 5rem 2rem; }
@@ -63,16 +63,16 @@ p + p { margin-top: -0.25rem; }
 strong { font-weight: 600; }
 
 /* --- Hero --- */
-.hero { background: var(--bg-hero); color: var(--text-inv); text-align: center; padding: 6.5rem 2rem 5.5rem; }
-.hero h1 { font-size: 3rem; font-weight: 700; line-height: 1.15; margin-bottom: 1.25rem; max-width: 820px; margin-left: auto; margin-right: auto; letter-spacing: -0.035em; color: #fff; }
-.hero .venue { font-size: 1.05rem; color: rgba(255,255,255,0.7); margin-bottom: 2.5rem; font-weight: 400; line-height: 1.7; }
-.hero .actions { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
-.hero .actions a, .hero .actions span { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.65rem 1.5rem; border-radius: 50px; font-size: 0.875rem; font-weight: 600; text-decoration: none; transition: transform var(--transition), box-shadow var(--transition), background var(--transition); }
-.hero .actions a { background: var(--accent); color: #fff; }
-.hero .actions a:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,113,227,0.4); background: var(--accent-hover); }
-.hero .actions a.secondary { background: rgba(255,255,255,0.14); color: rgba(255,255,255,0.9); }
-.hero .actions a.secondary:hover { background: rgba(255,255,255,0.22); box-shadow: 0 4px 16px rgba(255,255,255,0.08); }
-.hero .actions .disabled { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.45); cursor: default; }
+.hero { background: var(--bg); color: var(--text); text-align: center; padding: 6rem 2rem 5rem; border-bottom: 1px solid var(--border-light); }
+.hero h1 { font-size: 3.2rem; font-weight: 700; line-height: 1.12; margin-bottom: 1.25rem; max-width: 820px; margin-left: auto; margin-right: auto; letter-spacing: -0.04em; color: var(--primary); }
+.hero .venue { font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 2.5rem; font-weight: 400; line-height: 1.7; }
+.hero .actions { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; }
+.hero .actions a, .hero .actions span { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.6rem 1.4rem; border-radius: 50px; font-size: 0.85rem; font-weight: 600; text-decoration: none; transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border-color var(--transition); }
+.hero .actions a { background: var(--primary); color: #fff; }
+.hero .actions a:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
+.hero .actions a.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.hero .actions a.secondary:hover { border-color: var(--text-secondary); background: var(--bg-alt); }
+.hero .actions .disabled { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-light); cursor: default; }
 
 /* --- Overview figure --- */
 .overview-fig { text-align: center; margin: 2.5rem 0; }
@@ -91,9 +91,9 @@ strong { font-weight: 600; }
 
 /* --- Tables --- */
 .table-wrap { overflow-x: auto; margin: 1.5rem 0; border-radius: var(--radius); border: 1px solid var(--border-light); }
-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; background: var(--bg); }
-thead th { background: var(--bg-alt); color: var(--primary); font-weight: 600; text-align: left; padding: 0.75rem 1rem; white-space: nowrap; border-bottom: 1px solid var(--border-light); font-size: 0.82rem; letter-spacing: 0.01em; }
-tbody td { padding: 0.7rem 1rem; border-bottom: 1px solid var(--border-light); }
+table { width: 100%; border-collapse: collapse; font-size: 0.95rem; background: var(--bg); }
+thead th { background: var(--bg-alt); color: var(--primary); font-weight: 600; text-align: left; padding: 0.85rem 1rem; white-space: nowrap; border-bottom: 1px solid var(--border-light); font-size: 1rem; }
+tbody td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-light); }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: rgba(0,113,227,0.03); }
 
@@ -121,21 +121,22 @@ tbody tr:hover { background: rgba(0,113,227,0.03); }
 .sample-transcript { font-style: italic; color: var(--text-secondary); font-size: 0.9rem; }
 .sample-body { padding: 0; }
 .sample-body table { margin: 0; border: none; }
-.sample-body thead th { background: var(--bg-alt); color: var(--primary); font-size: 0.78rem; border-bottom: 1px solid var(--border-light); }
-.sample-body tbody td { font-size: 0.84rem; vertical-align: middle; }
+.sample-body thead th { background: var(--bg-alt); color: var(--primary); font-size: 0.88rem; border-bottom: 1px solid var(--border-light); }
+.sample-body tbody td { font-size: 0.86rem; vertical-align: middle; }
 .sample-body audio { height: 32px; width: 100%; min-width: 180px; }
 
 /* --- Statistics --- */
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 2rem; margin-bottom: 3.5rem; }
-.stat-item { text-align: center; }
-.stat-num { font-size: 2.6rem; font-weight: 700; color: var(--primary); line-height: 1.1; letter-spacing: -0.03em; }
-.stat-label { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.35rem; font-weight: 500; }
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 3.5rem; }
+.stat-item { text-align: center; background: var(--bg); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 1.25rem 0.75rem; transition: box-shadow var(--transition), transform var(--transition); }
+.stat-item:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+.stat-num { font-size: 1.75rem; font-weight: 700; color: var(--accent); line-height: 1.2; letter-spacing: -0.02em; }
+.stat-label { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.3rem; font-weight: 500; letter-spacing: 0.01em; }
 
 /* --- Charts --- */
-.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
-.chart-box { background: var(--bg); border-radius: var(--radius); padding: 1.75rem; border: 1px solid var(--border-light); }
-.chart-box h4 { font-size: 0.92rem; font-weight: 600; margin-bottom: 1.25rem; color: var(--primary); text-align: center; letter-spacing: -0.01em; }
-.chart-box canvas { max-height: 320px; }
+.chart-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-top: 2rem; }
+.chart-box { background: var(--bg); border-radius: var(--radius); padding: 1.75rem; border: 1px solid var(--border-light); height: 420px; position: relative; }
+.chart-box h4 { font-size: 0.92rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--primary); text-align: center; letter-spacing: -0.01em; }
+.chart-box canvas { width: 100% !important; height: calc(100% - 2.5rem) !important; }
 
 /* --- Policy --- */
 .policy-grid { display: grid; gap: 2.5rem; }
@@ -153,14 +154,15 @@ footer .footer-copy { font-size: 0.78rem; color: var(--text-secondary); opacity:
 /* --- Responsive --- */
 @media (max-width: 768px) {
   html { font-size: 15px; }
-  .hero { padding: 4rem 1.25rem 3.5rem; }
+  .hero { padding: 3.5rem 1.25rem 3rem; }
   .hero h1 { font-size: 2rem; }
   h2 { font-size: 1.6rem; }
   section { padding: 3rem 1.25rem; }
   nav .nav-inner { padding: 0 1.25rem; }
-  .stat-num { font-size: 1.8rem; }
-  .stat-grid { gap: 1.25rem; }
+  .stat-num { font-size: 1.5rem; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
   .chart-grid { grid-template-columns: 1fr; }
+  .chart-box { height: 300px; }
   .family-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
   .sample-header { padding: 0.9rem 1rem; }
   .chart-box { padding: 1.25rem; }
@@ -170,7 +172,8 @@ footer .footer-copy { font-size: 0.78rem; color: var(--text-secondary); opacity:
   .hero h1 { font-size: 1.65rem; }
   .hero .actions { gap: 0.5rem; }
   .hero .actions a, .hero .actions span { font-size: 0.78rem; padding: 0.55rem 1.1rem; }
-  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+  .stat-item { padding: 1rem 0.5rem; }
   .family-grid { grid-template-columns: 1fr; }
 }
 </style>
@@ -193,7 +196,7 @@ footer .footer-copy { font-size: 0.78rem; color: var(--text-secondary); opacity:
   <h1>ChainBench-ADD</h1>
   <div class="venue">A Delivery-Aware Dataset and Benchmark for Audio Deepfake Detection<br>ACM Multimedia 2026 &middot; November 10&ndash;14, Rio de Janeiro, Brazil</div>
   <div class="actions">
-    <a href="https://github.com/wtalioy/ChainBench" target="_blank">
+    <a href="https://github.com/wtalioy/ChainBench-ADD" target="_blank">
       <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       Code
     </a>
@@ -214,16 +217,15 @@ footer .footer-copy { font-size: 0.78rem; color: var(--text-secondary); opacity:
   <div class="section-label">Overview</div>
   <h2>What is ChainBench-ADD?</h2>
 
-  <p>Most audio deepfake benchmarks focus on the generation side of the problem. In practice, however, forged speech rarely reaches listeners in its raw synthesized form&mdash;it passes through platform re-encoding, telephony transmission, playback-and-recapture, or combinations of these. These post-generation <strong>delivery chains</strong> can substantially alter the acoustic cues that detectors rely on.</p>
+  <p>Existing audio deepfake datasets have greatly expanded evaluation across generators, languages, and domains, but most remain <strong>generation-centric</strong> and provide limited support for studying post-generation delivery. In realistic misuse scenarios, forged audio is often altered by platform re-encoding, telephony transmission, or replay-like recapture before it reaches a listener or an automated system. Recent delivery-related studies usually model such factors as isolated distortions rather than structured, ordered delivery routes, and often lack control over transcript and speaker conditions.</p>
 
-  <p><strong>ChainBench-ADD</strong> treats delivery as a first-class evaluation dimension. Rather than applying isolated augmentations, it organizes post-generation processing into a four-level hierarchy: <strong>delivery families</strong> (broad scenarios like telephony or replay), <strong>templates</strong> (ordered operator blueprints), <strong>variants</strong> (parameterized instantiations), and <strong>realized chains</strong> (end-to-end paths applied to individual utterances). Every delivered sample is linked back to a clean bona fide or spoof parent under fixed transcript and speaker conditions, so delivery effects can be studied in isolation.</p>
+  <p><strong>ChainBench-ADD</strong> addresses this gap by treating post-generation delivery as a <strong>structured benchmark dimension</strong>. It models delivery through reusable operators, ordered templates, and realized chains across five delivery families: direct, platform-like, telephony, simulated replay, and hybrid. Each delivered sample remains linked to a clean bona fide or spoof parent under <strong>matched-parent control</strong>, enabling attribution of detector behavior specifically to delivery rather than to differences in content, speaker, or source quality.</p>
 
   <figure class="overview-fig">
     <img src="overview_figure.png" alt="Overview of ChainBench-ADD showing the delivery hierarchy and matched-parent design">
-    <figcaption>Prior work mainly focuses on generation, whereas real misuse typically involves post-generation delivery such as platform re-encoding. ChainBench-ADD models these delivery chains in a structured way and enables controlled evaluation via matched-parent design and protocol-aware tasks.</figcaption>
   </figure>
 
-  <p>The current release contains <strong>941,201 waveforms</strong> derived from <strong>55,813 parents</strong> (18,703 bona fide from Common Voice and AISHELL-3; 37,110 spoof from six contemporary TTS systems) across <strong>448 speakers</strong> in English and Mandarin Chinese. It supports five protocol-aware evaluation tasks and a leave-one-template-out generalization protocol, all reconstructed from a shared metadata manifest.</p>
+  <p>The current release contains <strong>941,201 waveforms</strong> derived from <strong>55,813 parents</strong> (18,703 bona fide from Common Voice and AISHELL-3; 37,110 spoof from six contemporary TTS systems) across <strong>448 speakers</strong> in English and Mandarin Chinese. From the shared metadata, we define five evaluation tasks: in-chain detection, three matched local interventions (operator substitution, parameter perturbation, and order swap), and lineage-based delivery robustness. A leave-one-template-out protocol further tests transfer to unseen templates within a family.</p>
 </div>
 </section>
 
@@ -322,12 +324,6 @@ footer .footer-copy { font-size: 0.78rem; color: var(--text-secondary); opacity:
   </div>
   <p style="font-size:0.82rem;color:var(--text-secondary);margin-top:0.5rem;"><strong>Fam.</strong> P = Platform-like, T = Telephony, R = Simulated Replay, H = Hybrid. All operators are waveform-domain transforms, not symbolic tags.</p>
 
-  <div class="chart-grid" style="margin-top:2rem;">
-    <div class="chart-box">
-      <h4>Family &times; Operator Template Counts</h4>
-      <canvas id="heatmapChart"></canvas>
-    </div>
-  </div>
 </div>
 </section>
 
@@ -497,6 +493,7 @@ function initCharts() {
     options: {
       indexAxis: 'y',
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { position: 'bottom' } },
       scales: {
         x: { stacked: true, grid: { display: false }, ticks: { callback: v => (v/1000)+'k' } },
@@ -511,7 +508,7 @@ function initCharts() {
       labels: ['Bona Fide (315,573)', 'Spoof (625,628)'],
       datasets: [{ data: [315573, 625628], backgroundColor: ['#34c759', '#ff3b30'], borderWidth: 2, borderColor: '#fff' }]
     },
-    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
   });
 
   new Chart(document.getElementById('splitChart'), {
@@ -525,6 +522,7 @@ function initCharts() {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { position: 'bottom' } },
       scales: {
         y: { position: 'left', grid: { display: false }, ticks: { callback: v => (v/1000)+'k' } },
@@ -542,34 +540,12 @@ function initCharts() {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: { y: { grid: { display: false }, ticks: { callback: v => (v/1000)+'k' } }, x: { grid: { display: false } } }
     }
   });
 
-  const ops = ['resample','band-limit','codec','re-encode','packet loss','noise','RIR','call-path'];
-  const families = {
-    'Platform-like': [2,0,4,4,0,0,0,0],
-    'Telephony':     [2,3,6,0,3,0,0,3],
-    'Sim. Replay':   [2,0,0,3,0,2,5,0],
-    'Hybrid':        [3,3,5,2,2,0,6,0]
-  };
-  new Chart(document.getElementById('heatmapChart'), {
-    type: 'bar',
-    data: {
-      labels: ops,
-      datasets: Object.entries(families).map(([name, data], i) => ({
-        label: name,
-        data: data,
-        backgroundColor: ['#34c759','#0071e3','#ff3b30','#5856d6'][i]
-      }))
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { position: 'bottom' } },
-      scales: { y: { grid: { display: false }, title: { display: true, text: 'Templates containing operator' } }, x: { grid: { display: false } } }
-    }
-  });
 }
 
 function initNav() {
