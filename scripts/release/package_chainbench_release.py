@@ -10,7 +10,6 @@ import shutil
 import subprocess
 import tempfile
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -40,6 +39,21 @@ class ShardPlan:
 
 def format_gib(size_bytes: int) -> str:
     return f"{size_bytes / (1024**3):.2f} GiB"
+
+
+def manifest_shard_record(plan: ShardPlan, *, output_dir: Path | None = None) -> dict[str, object]:
+    record: dict[str, object] = {
+        "archive_name": plan.archive_name,
+        "split": plan.split,
+        "kind": plan.kind,
+        "file_count": plan.file_count,
+        "total_size_bytes": plan.total_size_bytes,
+    }
+    if output_dir is not None:
+        archive_path = output_dir / plan.archive_name
+        if archive_path.exists():
+            record["archive_size_bytes"] = archive_path.stat().st_size
+    return record
 
 
 def parse_args() -> argparse.Namespace:
@@ -246,12 +260,11 @@ def write_manifest(
         "dataset_name": dataset_root.name,
         "dataset_root": dataset_root.name,
         "extract_into": str(dataset_root.parent),
-        "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "archive_format": "tar.zst",
         "compression": {"codec": "zstd", "level": compression_level},
         "max_shard_bytes": max_shard_bytes,
         "max_shard_gib": round(max_shard_bytes / (1024**3), 3),
-        "shards": [asdict(item) for item in plan],
+        "shards": [manifest_shard_record(item, output_dir=output_dir) for item in plan],
         "suggested_upload": {
             "command": (
                 "python - <<'PY'\n"
@@ -307,7 +320,7 @@ def main() -> int:
                 "output_dir": str(output_dir),
                 "archive_count": len(plan),
                 "total_input_size_bytes": total_size,
-                "archives": [asdict(item) for item in plan],
+                "archives": [manifest_shard_record(item) for item in plan],
             },
             ensure_ascii=False,
             indent=2,
