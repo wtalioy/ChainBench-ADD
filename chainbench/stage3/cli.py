@@ -15,7 +15,7 @@ from chainbench.lib.cli import (
     load_rows_with_filters,
     resolve_config_argument,
 )
-from chainbench.lib.logging import get_logger, setup_logging
+from chainbench.lib.logging import get_logger, setup_logging, format_elapsed
 from chainbench.lib.config import default_workspace_root, load_json, relative_to_workspace, resolve_path
 from chainbench.lib.io import write_csv, write_json
 from chainbench.lib.summary import print_json, utc_now_iso
