@@ -1,6 +1,5 @@
 # ChainBench-ADD
 
-[![Project%20Page%20-%20ChainBench--ADD](https://img.shields.io/badge/GitHub-Demo-orange?logo=github)](https://wtalioy.github.io/ChainBench-ADD/)
 [![Hugging Face%20-%20ChainBench](https://img.shields.io/badge/🤗%20Hugging%20Face%20-%20ChainBench-blue)](https://huggingface.co/datasets/Lioy/ChainBench)
 
 ChainBench-ADD is a delivery-aware audio deepfake benchmark built around **matched clean parents**, **structured post-generation delivery chains**, and **protocol-aware evaluation**. The repository contains the full five-stage construction pipeline, the metadata annotation/export step, and a unified baseline evaluation pipeline for the five benchmark tasks introduced in the ChainBench-ADD paper.
