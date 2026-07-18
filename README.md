@@ -13,6 +13,10 @@ ChainBench-ADD is a delivery-aware audio deepfake benchmark built around **match
 git clone https://github.com/wtalioy/ChainBench-ADD.git
 cd ChainBench-ADD
 git submodule update --init --recursive
+
+wget -O xlsr2_300m.pt https://dl.fbaipublicfiles.com/fairseq/wav2vec/xlsr2_300m.pt
+ln -s xlsr2_300m.pt baselines/Nes2Net_ASVspoof_ITW/xlsr2_300m.pt
+ln -s xlsr2_300m.pt baselines/SLSforASVspoof-2021-DF/xlsr2_300m.pt
 ```
 
 ### Create the main orchestration environment
