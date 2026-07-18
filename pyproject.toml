@@ -29,6 +29,27 @@ torch = [
 [project.scripts]
 chainbench = "chainbench.cli:main"
 
-[tool.setuptools.packages.find]
-include = ["chainbench*"]
-
+[tool.setuptools]
+packages = [
+    "chainbench",
+    "chainbench.eval",
+    "chainbench.eval.baselines",
+    "chainbench.eval.baselines.native",
+    "chainbench.eval.baselines.native.aasist",
+    "chainbench.eval.baselines.native.nes2net",
+    "chainbench.eval.baselines.native.safeear",
+    "chainbench.eval.baselines.native.sls_df",
+    "chainbench.eval.metrics",
+    "chainbench.eval.pipeline",
+    "chainbench.eval.preservation",
+    "chainbench.eval.tasks",
+    "chainbench.lib",
+    "chainbench.release",
+    "chainbench.stage1",
+    "chainbench.stage2",
+    "chainbench.stage3",
+    "chainbench.stage3.runner",
+    "chainbench.stage4",
+    "chainbench.stage4.operators",
+    "chainbench.stage5",
+]

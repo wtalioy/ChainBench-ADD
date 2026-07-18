@@ -11,7 +11,8 @@ from chainbench.lib.proc import run_command_streaming
 
 from ..tasks import TaskPack
 
-SCRIPT_ROOT = Path(__file__).resolve().parents[2]
+WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
+PACKAGE_ROOT = WORKSPACE_ROOT / "chainbench"
 
 
 @dataclass
@@ -64,7 +65,7 @@ class BaselineRunner:
         log_path: Path,
         extra_env: dict[str, str] | None = None,
     ) -> BaselineRunResult:
-        env = {"PYTHONPATH": str(SCRIPT_ROOT), **dict(self.config.get("env", {}))}
+        env = {"PYTHONPATH": f"{WORKSPACE_ROOT}:{PACKAGE_ROOT}", **dict(self.config.get("env", {}))}
         if extra_env:
             env.update(extra_env)
         returncode = run_command_streaming(command, cwd=cwd, log_path=log_path, env=env, tee_output=False)
