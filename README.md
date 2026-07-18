@@ -9,7 +9,7 @@ ChainBench-ADD is a delivery-aware audio deepfake benchmark built around **match
 ### Clone and pull submodules
 
 ```bash
-git clone https://github.com/wtalioy/ChainBench-ADD.git
+git clone https://https://anonymous.4open.science/r/ChainBench-ADD.git
 cd ChainBench-ADD
 git submodule update --init --recursive
 
